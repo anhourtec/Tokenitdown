@@ -36,6 +36,9 @@ For any UI change, verify it in a real browser with Playwright — don't rely on
 ### 7. Stay narrow, ship complete work
 Do exactly what was asked — no scope creep, no unrequested refactors. But finish it completely: no half-done features, no TODOs left where working code belongs.
 
+### 8. Update `HANDOFF.md` before every commit
+Before running `git commit`, update `HANDOFF.md` so it reflects the work being committed (progress, what worked, what didn't, next steps). The handoff must never lag behind the commit history. Do this automatically — it should never need to be asked for.
+
 ---
 
 ## High-level architecture

@@ -4,7 +4,7 @@
 
 **Project:** TokenItDown — document & web → LLM-ready Markdown platform
 **Company:** AnHourTec · **Package manager:** npm only
-**Last updated:** 2026-06-25
+**Last updated:** 2026-06-26
 
 ---
 
@@ -23,10 +23,18 @@ Cleanup / de-branding is **complete**:
 - **Removed graphics:** `assets/` (Blazity logos), `.github/assets/` (project-logo PNGs), `graph.svg`.
 - **License:** kept MIT, copyright → `2026 AnHourTec`.
 - **Removed Vercel:** deleted `vercel.json` (deploying via Docker instead).
-- **Added `CLAUDE.md`** (7 working rules + high-level architecture), `DESIGN.md` (visual system — colors + typography only), `PLAN.md` (full product plan), `.env.example`, and this `HANDOFF.md`.
+- **Added `CLAUDE.md`** (8 working rules + high-level architecture), `DESIGN.md` (visual system — colors + typography only), `PLAN.md` (full product plan), `.env.example`, and this `HANDOFF.md`.
 - **Fixed `npm install` ERESOLVE conflict:** removed the 5 stale `@opentelemetry/*` pins from `package.json` (unused in source; only `@vercel/otel` is imported, and its peer range `resources >=1.19.0` clashed with the pinned `1.18.1`). `npm install` now succeeds; `@vercel/otel` resolves its own peers.
 
 `npm install` completed successfully (1713 packages). Note: `npm audit` reports 43 vulnerabilities (mostly moderate, transitive) — not yet addressed.
+
+**CI slimmed down (decided with user):**
+- Replaced the three inherited workflows with a **single lean `check.yml`**: `npm ci` → typecheck → lint → `vitest run` → build (uses `node-version-file: .github/nodejs.version`, now pinned to `22`).
+- Deleted `playwright.yml` and `nextjs_bundle_analysis.yml` (premature pre-build; re-add e2e/bundle tracking when there's a real product to test).
+- Added a `typecheck` script (`tsc --noEmit`) and **removed the deprecated `tsc` wrapper package** that shadowed the real TypeScript binary; ignore `*.tsbuildinfo`.
+- Fixed the stale e2e assertion (`e2e/example.spec.ts`) title regex → `/TokenItDown/`.
+
+**Workflow rule added:** `CLAUDE.md` now has rule **#8 — update `HANDOFF.md` before every commit** (keep this file ahead of the commit history, automatically).
 
 ## What Worked
 - Grep-based scrubbing (`grep -rIn -i "blazity\|next-enterprise\|pnpm"`) to confirm no stray references remain — repeat this after future edits.
