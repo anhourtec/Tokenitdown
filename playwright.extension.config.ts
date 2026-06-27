@@ -7,7 +7,10 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: 0,
   reporter: "list",
+  // Extension tests need extra time: Chrome launch + extension load + assertions.
+  timeout: 90000,
   use: {
     trace: "on-first-retry",
+    actionTimeout: 15000,
   },
 })
