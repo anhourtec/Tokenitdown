@@ -1,0 +1,57 @@
+name: tokenitdown
+
+# This stack runs ONLY Postgres + Redis, deployed on 192.168.69.16. The web app
+# is NOT containerised — it runs via `npm run dev` (locally) pointing at this
+# server. Ports are deliberately different from BookYourPTO-SaaS (5432 / 6385)
+# so both projects' data services coexist on the same host:
+#   Postgres -> host 5433  (container 5432)
+#   Redis    -> host 6386  (container 6379)
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: tokenitdown-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-tokenitdown}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-tokenitdown}
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-tokenitdown} -d ${POSTGRES_DB:-tokenitdown}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - tokenitdown-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: tokenitdown-redis
+    restart: unless-stopped
+    # requirepass is mandatory: Redis 7 protected-mode drops non-loopback
+    # clients when no password is set, so any LAN client connecting to the
+    # published port would silently fail.
+    command: redis-server --appendonly yes --requirepass "${REDIS_PASSWORD:?set REDIS_PASSWORD in .env}"
+    ports:
+      - "6386:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - tokenitdown-network
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  tokenitdown-network:
+    driver: bridge
