@@ -277,3 +277,70 @@ that path).
 
 ### Step 5 — CI support
 The Playwright extension tests require `headless: false`. On Linux CI this needs `xvfb-run`. The extension tests are excluded from the main Playwright config (`playwright.config.ts`) — they need a separate CI job or `xvfb-run` wrapper.
+
+---
+
+## Capture Quality — Findings & Improvement Plan (session 2026-06-27)
+
+A live capture of a tall marketing page (bookyourpto.com, ~17.5k px) surfaced
+that our output quality lags dedicated extensions (Awesome Screenshot, GoFullPage).
+This section records what those tools do and the concrete defects in our pipeline.
+
+### What the best extensions use
+
+- **Awesome Screenshot & GoFullPage use the same family as us** — scroll in
+  viewport steps, capture each with `chrome.tabs.captureVisibleTab`, stitch onto a
+  canvas. Their quality comes from handling the hard parts carefully, not a secret API.
+- **The one genuinely higher-fidelity API is the Chrome DevTools Protocol** via the
+  `chrome.debugger` permission:
+  ```js
+  chrome.debugger.attach({ tabId }, "1.3")
+  chrome.debugger.sendCommand({ tabId }, "Page.captureScreenshot",
+    { format: "png", captureBeyondViewport: true })
+  chrome.debugger.detach({ tabId })
+  ```
+  This renders the whole page in a single compositor pass — no scrolling, no
+  stitching, so no seams / fixed-element duplication / scroll-timing / DPR
+  resampling. Trade-offs: shows the yellow "DevTools is debugging this browser"
+  banner, needs the `debugger` permission, can't capture `chrome://` / Web Store
+  pages, and is bounded by encode/size limits.
+
+### Concrete defects in our current scroll-and-stitch
+
+| # | Defect | Where | Effect |
+|---|--------|-------|--------|
+| 1 | `captureVisibleTab` rate-limit ignored — Chrome caps it at ~2 calls/sec; settle is 150ms | `service-worker.ts:13` | Quota errors → failed/duplicated frames → seams & duplicated strips (biggest issue) |
+| 2 | DPR/width resampling — canvas width is `scrollWidth*DPR` but frames are drawn rescaled to it, not 1:1 with `img.width` | `stitch.ts:19,52` | Horizontal rescale → soft/blurry text |
+| 3 | Scrollbar width counted in `scrollWidth` but absent from the capture | `stitch.ts:19` | Slight horizontal stretch |
+| 4 | Page height measured once, up-front | `service-worker.ts:54` | Lazy/reveal content grows the page mid-capture → misaligned stitch / missed bottom |
+| 5 | Sub-pixel seams — `scrollY*DPR` placed without integer rounding | `stitch.ts:42,45` | Faint horizontal seam lines |
+| 6 | Header dropped entirely — we hide *all* fixed elements for the whole capture | `service-worker.ts:57` | Fixed nav/header missing from output |
+| 7 | Settle too short for lazy/animated content | `service-worker.ts:13` | Reveal-on-scroll sections come out blank |
+
+### Plan
+
+**Strategy A — Add a CDP capture path (recommended; biggest quality jump, least code).**
+1. Add `"debugger"` to manifest permissions.
+2. New `lib/captureCDP.ts`: `attach` → `Page.enable` → `Page.getLayoutMetrics`
+   (read `cssContentSize` for true full dimensions) → optionally
+   `Emulation.setDeviceMetricsOverride` to pin `deviceScaleFactor` →
+   `Page.captureScreenshot({ captureBeyondViewport: true, clip })` → `detach`.
+3. Make it the **primary** path; fall back to scroll-stitch when attach fails or
+   the page is restricted (`chrome://`, store, user declines).
+4. Playwright e2e: capture a tall page, assert output dimensions ≈ `cssContentSize`.
+
+**Strategy B — Harden the scroll-stitch fallback to GoFullPage parity** (no-banner mode + restricted pages):
+1. Throttle captures to ≥500ms **and** catch the quota error with retry/backoff (#1).
+2. Derive scale from the actual captured image width vs `innerWidth`; draw frames
+   1:1 at integer device-pixel offsets (#2, #5).
+3. Re-measure `scrollHeight` during the scroll loop; continue until it stops growing (#4).
+4. Keep fixed elements visible on frame 1, hide for the rest (#6).
+5. Longer settle + dispatch scroll events + `await img.decode()` for lazy media (#7).
+6. Tile output when it exceeds the 16384px canvas limit instead of cropping.
+
+**Sequencing:** ship A first (~80% of the gap for normal pages), then B so the
+fallback is solid for `chrome://` / debugger-declined cases. One focused commit each.
+
+**Sources:** [Full-Page-Screenshot (CDP)](https://github.com/sssstf0rest/Full-Page-Screenshot) ·
+[captureBeyondViewport — screenshotone](https://screenshotone.com/blog/capture-beyond-viewport-in-puppeteer-and-chrome-devtools-protocol/) ·
+[GoFullPage](https://chromewebstore.google.com/detail/gofullpage-full-page-scre/fdpohaocaechififmbbbbbknoalclacl)
