@@ -61,7 +61,7 @@ is **Drizzle** (not Prisma as PLAN.md text says) — lighter, no engine binary.
 - `docker-compose.yml` builds the Next.js app (`Dockerfile`) and runs it
   alongside Postgres + Redis, deployed on **192.168.69.16**.
 - Ports differ from BookYourPTO-SaaS (3010/5432/6385) to coexist on that host:
-  **Web `3020:3000`, Postgres `5433:5432`, Redis `6386:6379`**. Redis uses `requirepass`.
+  **Web `${WEB_PORT:-3030}:3000`, Postgres `5433:5432`, Redis `6386:6379`**. Redis uses `requirepass`.
 - `deploy.sh` mirrors BookYourPTO's `build.sh`: stop → remove this project's old
   images → `docker compose build --no-cache` → `up -d` → status.
 - **`scripts/docker-deploy.mjs`** is the web container's entrypoint (CMD): it
@@ -69,7 +69,7 @@ is **Drizzle** (not Prisma as PLAN.md text says) — lighter, no engine binary.
   waits for Postgres, ensures the DB + runs Drizzle migrations, then `next start`.
   Inside compose the web talks to `postgres:5432` / `redis:6379` (overridden);
   set `BETTER_AUTH_URL` in the server's `.env` to the public URL (e.g.
-  `http://192.168.69.16:3020`). The web image keeps full deps (incl. drizzle-kit).
+  `http://192.168.69.16:3030`; set WEB_PORT if it clashes). The web image keeps full deps (incl. drizzle-kit).
 - You can still run the app locally with `npm run dev` against the same DB.
 - **CI removed:** deleted `.github/workflows/check.yml` (was failing; not needed
   right now — re-add when ready).
@@ -191,9 +191,9 @@ Ported the **sidebar design + home ("default") dashboard** from
 
 ## Next Steps
 1. **Deploy:** on the server (192.168.69.16) copy `.env.example` → `.env`, set real
-   passwords + `BETTER_AUTH_URL=http://192.168.69.16:3020`, run `./deploy.sh`
+   passwords + `BETTER_AUTH_URL=http://192.168.69.16:3030` (match WEB_PORT), run `./deploy.sh`
    (builds the web image + brings up web/Postgres/Redis; migrations run on web
-   startup). App at `http://192.168.69.16:3020`. Locally you can `npm run dev`.
+   startup). App at `http://192.168.69.16:3030` (or your WEB_PORT). Locally you can `npm run dev`.
 2. **Layer the rest of auth (PLAN §4.6):** email verification, password reset,
    2FA (TOTP + email OTP), rate limiting, audit log, session rotation. better-auth
    has plugins for most of this — wire them in `lib/auth.ts` and regenerate the
