@@ -43,7 +43,9 @@ export const auth = betterAuth({
     // Secure cookies require HTTPS — base it on the URL scheme, not NODE_ENV, so
     // a plain-HTTP LAN deploy (e.g. http://192.168.x.x:3030) still keeps sessions.
     // Put the app behind HTTPS in production for `Secure` cookies.
-    useSecureCookies: env.BETTER_AUTH_URL.startsWith("https://"),
+    // String() guards against env.BETTER_AUTH_URL being undefined during the
+    // build (SKIP_ENV_VALIDATION) when this module is evaluated.
+    useSecureCookies: String(env.BETTER_AUTH_URL).startsWith("https://"),
     cookies: {
       session_token: {
         attributes: {
