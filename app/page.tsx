@@ -14,6 +14,19 @@ export const metadata: Metadata = {
 export default function Web() {
   return (
     <>
+      <header className="bg-white dark:bg-gray-900">
+        <nav className="mx-auto flex max-w-(--breakpoint-xl) items-center justify-between px-4 py-4">
+          <span className="text-xl font-extrabold tracking-tight text-gray-900 dark:text-white">TokenItDown</span>
+          <div className="flex items-center gap-3">
+            <Button href="/login" intent="secondary" size="sm">
+              Log in
+            </Button>
+            <Button href="/register" size="sm">
+              Sign up
+            </Button>
+          </div>
+        </nav>
+      </header>
       <section className="bg-white dark:bg-gray-900">
         <div className="mx-auto grid max-w-(--breakpoint-xl) px-4 py-8 text-center lg:py-16">
           <div className="mx-auto place-self-center">
@@ -24,7 +37,7 @@ export default function Web() {
               Drop in a file or a web page, get agent-ready Markdown out — and let your AI read it directly, for a
               fraction of the tokens.
             </p>
-            <Button href="/" className="mr-3">
+            <Button href="/register" className="mr-3">
               Get started
             </Button>
           </div>

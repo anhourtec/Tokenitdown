@@ -1,9 +1,9 @@
 import { AuthForm } from "../AuthForm"
 
 export const metadata = {
-  title: "Sign up · TokenItDown",
+  title: "Create account · TokenItDown",
 }
 
-export default function SignupPage() {
-  return <AuthForm mode="signup" />
+export default function RegisterPage() {
+  return <AuthForm mode="register" />
 }

@@ -4,36 +4,51 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
 
+import { Button } from "../../components/ui/button"
+import { Card, CardContent } from "../../components/ui/card"
+import { Checkbox } from "../../components/ui/checkbox"
+import { Input } from "../../components/ui/input"
+import { Label } from "../../components/ui/label"
+import { Logo } from "../../components/ui/logo"
 import { signIn, signUp } from "../../lib/auth-client"
 
-type Mode = "login" | "signup"
-
-const inputClass =
-  "w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-gray-900 outline-none transition-colors focus:border-blue-400 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+type Mode = "login" | "register"
 
 /**
- * Shared email/password form for the login and signup routes. Talks to
- * better-auth via the browser auth client; on success it routes to /dashboard.
+ * Shared email/password form for the /login and /register routes, styled with
+ * the shadcn/ui primitives. Talks to better-auth via the browser auth client;
+ * on success it routes to /dashboard.
  */
 export function AuthForm({ mode }: { mode: Mode }) {
   const router = useRouter()
+  const isRegister = mode === "register"
+
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [confirmPassword, setConfirmPassword] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
-
-  const isSignup = mode === "signup"
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
-    setPending(true)
 
-    const { error: authError } = isSignup
+    if (isRegister) {
+      if (password.length < 8) {
+        setError("Password must be at least 8 characters.")
+        return
+      }
+      if (password !== confirmPassword) {
+        setError("Passwords do not match.")
+        return
+      }
+    }
+
+    setPending(true)
+    const { error: authError } = isRegister
       ? await signUp.email({ name, email, password })
       : await signIn.email({ email, password })
-
     setPending(false)
 
     if (authError) {
@@ -46,84 +61,147 @@ export function AuthForm({ mode }: { mode: Mode }) {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-sm flex-col gap-6">
-      <div className="flex flex-col gap-1 text-center">
-        <h1 className="text-2xl font-extrabold tracking-tight text-gray-900 dark:text-white">
-          {isSignup ? "Create your account" : "Welcome back"}
-        </h1>
-        <p className="text-sm text-gray-600 dark:text-gray-400">
-          {isSignup ? "Start turning documents into clean Markdown." : "Sign in to your TokenItDown account."}
+    <div className="flex w-full flex-1 flex-col justify-center px-4 py-10 lg:px-6">
+      <div className="sm:mx-auto sm:w-full sm:max-w-md">
+        <Logo className="text-foreground mx-auto h-10 w-10" aria-hidden={true} />
+        <h3 className="text-foreground mt-4 text-center text-lg font-bold">
+          {isRegister ? "Create your TokenItDown account" : "Sign in to TokenItDown"}
+        </h3>
+        <p className="text-muted-foreground mt-1 text-center text-sm">
+          {isRegister
+            ? "Start turning documents into clean Markdown."
+            : "Welcome back — sign in to continue."}
         </p>
       </div>
 
-      <form onSubmit={onSubmit} className="flex flex-col gap-4">
-        {isSignup && (
-          <label className="flex flex-col gap-1.5 text-sm font-medium text-gray-900 dark:text-gray-100">
-            Name
-            <input
-              type="text"
-              autoComplete="name"
-              required
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className={inputClass}
-            />
-          </label>
-        )}
+      <Card className="mt-6 sm:mx-auto sm:w-full sm:max-w-md">
+        <CardContent>
+          <form onSubmit={onSubmit} className="space-y-4">
+            {isRegister && (
+              <div>
+                <Label htmlFor="name" className="text-foreground text-sm font-medium">
+                  Name
+                </Label>
+                <Input
+                  id="name"
+                  name="name"
+                  type="text"
+                  autoComplete="name"
+                  required
+                  placeholder="Ada Lovelace"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="mt-2"
+                />
+              </div>
+            )}
 
-        <label className="flex flex-col gap-1.5 text-sm font-medium text-gray-900 dark:text-gray-100">
-          Email
-          <input
-            type="email"
-            autoComplete="email"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className={inputClass}
-          />
-        </label>
+            <div>
+              <Label htmlFor="email" className="text-foreground text-sm font-medium">
+                Email
+              </Label>
+              <Input
+                id="email"
+                name="email"
+                type="email"
+                autoComplete="email"
+                required
+                placeholder="you@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="mt-2"
+              />
+            </div>
 
-        <label className="flex flex-col gap-1.5 text-sm font-medium text-gray-900 dark:text-gray-100">
-          Password
-          <input
-            type="password"
-            autoComplete={isSignup ? "new-password" : "current-password"}
-            required
-            minLength={8}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className={inputClass}
-          />
-        </label>
+            <div>
+              <Label htmlFor="password" className="text-foreground text-sm font-medium">
+                Password
+              </Label>
+              <Input
+                id="password"
+                name="password"
+                type="password"
+                autoComplete={isRegister ? "new-password" : "current-password"}
+                required
+                minLength={8}
+                placeholder="Password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="mt-2"
+              />
+            </div>
 
-        {error && (
-          <p role="alert" className="text-sm text-red-500">
-            {error}
-          </p>
-        )}
+            {isRegister && (
+              <div>
+                <Label htmlFor="confirm-password" className="text-foreground text-sm font-medium">
+                  Confirm password
+                </Label>
+                <Input
+                  id="confirm-password"
+                  name="confirm-password"
+                  type="password"
+                  autoComplete="new-password"
+                  required
+                  minLength={8}
+                  placeholder="Password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="mt-2"
+                />
+              </div>
+            )}
 
-        <button
-          type="submit"
-          disabled={pending}
-          className="inline-flex min-h-12 items-center justify-center rounded-xl border border-blue-400 bg-blue-400 px-6 text-lg text-white transition-colors hover:enabled:bg-blue-700 disabled:opacity-60"
-        >
-          {pending ? "Please wait…" : isSignup ? "Sign up" : "Sign in"}
-        </button>
-      </form>
+            {isRegister && (
+              // Hidden for now (kept in code for later).
+              <div className="mt-2 hidden items-start">
+                <div className="flex h-6 items-center">
+                  <Checkbox id="newsletter" name="newsletter" className="size-4" />
+                </div>
+                <Label htmlFor="newsletter" className="text-muted-foreground ml-3 text-sm leading-6 font-normal">
+                  Sign up to our newsletter
+                </Label>
+              </div>
+            )}
 
-      <p className="text-center text-sm text-gray-600 dark:text-gray-400">
-        {isSignup ? (
+            {error && (
+              <p role="alert" className="text-destructive text-sm">
+                {error}
+              </p>
+            )}
+
+            <Button type="submit" disabled={pending} className="mt-2 w-full py-2 font-medium">
+              {pending ? "Please wait…" : isRegister ? "Create account" : "Sign in"}
+            </Button>
+
+            {isRegister && (
+              <p className="text-muted-foreground text-center text-xs">
+                By creating an account, you agree to our{" "}
+                <Link href="/" className="text-primary hover:text-primary/90 capitalize">
+                  Terms of use
+                </Link>{" "}
+                and{" "}
+                <Link href="/" className="text-primary hover:text-primary/90 capitalize">
+                  Privacy policy
+                </Link>
+              </p>
+            )}
+          </form>
+        </CardContent>
+      </Card>
+
+      <p className="text-muted-foreground mt-6 text-center text-sm">
+        {isRegister ? (
           <>
             Already have an account?{" "}
-            <Link href="/login" className="font-medium text-blue-400 hover:underline">
+            <Link href="/login" className="text-primary hover:text-primary/90 font-medium">
               Sign in
             </Link>
           </>
         ) : (
           <>
             Don&apos;t have an account?{" "}
-            <Link href="/signup" className="font-medium text-blue-400 hover:underline">
-              Sign up
+            <Link href="/register" className="text-primary hover:text-primary/90 font-medium">
+              Create one
             </Link>
           </>
         )}
