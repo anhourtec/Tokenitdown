@@ -71,11 +71,32 @@ is **Drizzle** (not Prisma as PLAN.md text says) — lighter, no engine binary.
 - `.env` (gitignored, now incl. `.env` in `.gitignore`) holds real creds;
   `.env.example` documents everything with easy placeholder passwords.
 
-**Verified:** typecheck ✓, lint ✓, `vitest run` ✓ (7 tests incl. new
-`scripts/ensure-db.test.ts`), `docker compose config` ✓, `deploy.sh` syntax ✓.
-**Not yet exercised against a live DB** — signup/login needs Postgres up. Once
-`deploy.sh` has run on the server, run `npm run db:setup` then `npm run dev`
-and confirm signup → /dashboard → sign out.
+**shadcn/ui auth UI + routing:**
+- Routes are **`/login`** and **`/register`** (was `/signup`).
+- Set up shadcn for Tailwind v4 (no prior config): `components.json`, `lib/utils.ts`
+  (`cn`), design tokens in `styles/tailwind.css` (`@theme inline` + CSS vars,
+  primary = AnHourTec blue #2563EB, **media-based dark** to match the app), and
+  primitives in `components/ui/` (button, card, checkbox, input, label, separator,
+  logo). Added deps: `lucide-react`, `@radix-ui/react-separator`.
+- `app/(auth)/AuthForm.tsx` rewritten with these primitives (card layout, logo,
+  confirm-password + match validation on register, newsletter checkbox is
+  cosmetic for now). Still wired to better-auth.
+- Home page (`app/page.tsx`) has a nav with Log in / Sign up → /login, /register.
+
+**Fixed a pre-existing breakage:** `@vercel/otel` (used by `instrumentation.ts`)
+had all 7 OpenTelemetry peer deps missing (removed in the earlier pin cleanup),
+which broke `next dev` with "Can't resolve @opentelemetry/api-logs". Reinstalled
+compatible 1.x/0.5x versions.
+
+**Auto-migrate on dev:** `npm run dev` now runs `scripts/dev-start.mjs`
+(ensure-db → drizzle migrate → `next dev`), mirroring BookYourPTO's dev flow, so
+the schema is always current.
+
+**Verified end-to-end (browser, Playwright):** register → /dashboard, sign out →
+/login, protected /dashboard redirects when logged out, login API 200 / wrong
+password 401, users persisted in the server DB. typecheck ✓, lint ✓,
+`vitest run` ✓ (7 tests), `docker compose config` ✓. Screenshots in
+`.playwright-mcp/` (gitignored).
 
 ## What Worked
 - Grep-based scrubbing (`grep -rIn -i "blazity\|next-enterprise\|pnpm"`) to confirm no stray references remain — repeat this after future edits.
