@@ -98,6 +98,67 @@ password 401, users persisted in the server DB. typecheck ✓, lint ✓,
 `vitest run` ✓ (7 tests), `docker compose config` ✓. Screenshots in
 `.playwright-mcp/` (gitignored).
 
+## Admin dashboard + sidebar (ported from next-shadcn-admin-dashboard)
+
+Ported the **sidebar design + home ("default") dashboard** from
+`arhamkhnz/next-shadcn-admin-dashboard`, recolored to AnHourTec and wired to our auth.
+
+- **shadcn alias:** `tsconfig` now has `@/* -> ./*` so vendored files' `@/...`
+  imports resolve to project root. Installed deps: `radix-ui` (umbrella),
+  `recharts`, `date-fns`, `@tanstack/react-table`, `tw-animate-css`.
+- **Tokens & font:** `styles/tailwind.css` uses the source's **neutral (zinc)
+  oklch palette** for chrome (background/card/muted/accent/border/sidebar) so the
+  look matches Studio Admin (no blue tint), with AnHourTec blue only as
+  primary/ring/chart. Font is **Geist** via the self-hosted `geist` package
+  (`app/layout.tsx` sets the `--font-geist-sans/mono` vars; `--font-sans` maps to
+  it). Dark stays media-based.
+- **shadcn custom variants** (`@custom-variant data-active/open/closed/checked/…`
+  + `no-scrollbar` utility) are inlined in `styles/tailwind.css`. Without them,
+  bare `data-active:` compiled to match attribute *presence*, so every sidebar
+  item (even `data-active="false"`) showed the active background. The variants
+  use `[data-active]:not([data-active="false"])` so only true-valued items match.
+- Sidebar uses `variant="inset"`; footer has the "Looking for something more?"
+  support card; header separator matches the source (`self-center`).
+- **Theming:** dark mode is now **class-based via `next-themes`** (was
+  media-based). `app/providers.tsx` wraps the app in `ThemeProvider`
+  (attribute="class", system default); `styles/tailwind.css` adds
+  `@custom-variant dark (&:is(.dark *))` and the dark tokens live under `.dark`.
+  Header has a **theme switcher** (light/dark/system), a **GitHub** link, and an
+  **account avatar menu** (sign-out wired) — `app/dashboard/_components/header/`.
+  The layout-controls/preferences popover from the source is intentionally
+  omitted (needs the zustand preferences store).
+- **LAN dev access:** `npm run dev` now binds `-H 0.0.0.0` and `scripts/dev-start.mjs`
+  auto-detects the LAN IP, prints a shareable `http://<lan-ip>:<port>` URL, and
+  injects it into `TRUSTED_ORIGINS` so others on the network can sign in
+  (better-auth blocks cross-origin POSTs otherwise). `env.mjs` gained optional
+  `TRUSTED_ORIGINS` (comma-separated); `lib/auth.ts` merges it into trustedOrigins.
+- **UI primitives** (vendored into `components/ui/`, kept close to source so they
+  re-generate cleanly): button, card, input, label, checkbox, separator, badge,
+  skeleton, avatar, tooltip, collapsible, dropdown-menu, sheet, select, table,
+  chart, sidebar. `tooltip.tsx` was patched so `Tooltip` self-wraps in
+  `TooltipProvider` (the source relied on a global provider).
+- **Sidebar:** `app/dashboard/_components/sidebar/` — `app-sidebar` (custom,
+  TokenItDown nav + logo), `nav-main` (vendored), `nav-user` (wired to
+  better-auth `signOut`). Nav config in `navigation/sidebar/sidebar-items.ts`
+  (Workspace / AI / Settings; non-built routes are `#` placeholders).
+- **Home dashboard:** `app/dashboard/_components/home/` — metric-cards,
+  performance-overview (recharts), subscriber-overview + recent-customers-table
+  (@tanstack/react-table). Rendered by `app/dashboard/page.tsx`.
+- **Layout/routing:** `app/dashboard/layout.tsx` = SidebarProvider + AppSidebar
+  + header (SidebarTrigger), with the authoritative session guard (redirect to
+  /login). The old homepage is gone — `app/page.tsx` now `redirect("/dashboard")`.
+- ESLint ignores the vendored dirs (`components/ui/**`, `hooks/**`, the home
+  `_components/home/**`, `nav-main.tsx`).
+- **Verified:** `next build` ✓ (8 routes), typecheck ✓, lint ✓; browser
+  (Playwright) register → dashboard renders (sidebar + cards + chart + table),
+  nav-user Log out → /login, `/` → /dashboard → /login when logged out.
+  Screenshot: `.playwright-mcp/dashboard-full.png`.
+- **Note:** build prints a non-fatal `jose`/Edge-runtime warning from
+  better-auth's cookie helper imported in `middleware.ts` (only reads the
+  cookie); functions correctly.
+- **Not committed** — pending user testing. `lp-items.tsx`, `components/Button`,
+  `components/SignOutButton` are now unused (left in place); remove later if desired.
+
 ## What Worked
 - Grep-based scrubbing (`grep -rIn -i "blazity\|next-enterprise\|pnpm"`) to confirm no stray references remain — repeat this after future edits.
 - Converting `pnpm.overrides` → top-level npm `overrides` (npm uses a different key).
