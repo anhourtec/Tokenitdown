@@ -29,15 +29,44 @@ cd extension && npm run typecheck # zero TS errors
 
 ---
 
-## Current Status — Chrome launch broken (needs diagnosis)
+## Current Status — extension loads, 3 e2e tests pass ✅
 
 | Item | Status |
 |------|--------|
 | `extension/manifest.json` — service worker format fix | ✅ Fixed (`"type": "module"` removed) |
-| `extension/src/icons/` — placeholder PNG icons | ✅ Created (1×1 minimal PNG for 16/32/48/128px) |
+| `extension/public/src/icons/` — placeholder PNG icons | ✅ Moved to `public/`; build copies them to `dist/` every time |
 | `extension/src/lib/screenshot.test.ts` — 7 unit tests | ✅ All pass |
-| `e2e/extension.spec.ts` — 3 Playwright e2e tests | ❌ Failing — Chrome exits before tests run (see below) |
+| `e2e/extension.spec.ts` — 3 Playwright e2e tests | ✅ All pass (1.7s) |
 | `playwright.extension.config.ts` + npm script | ✅ In place |
+
+### Resolution of the "Chrome launch crash" (session 2026-06-27)
+
+The real failure was **never a Chrome crash** — Chrome launched fine, but the
+extension silently failed to load because its **icon files were missing from
+`dist/`**. Chrome refuses (silently) to load an unpacked extension whose manifest
+references files that don't exist.
+
+**Why the icons were missing:** `vite-plugin-web-extension@4.x` only treats
+specific manifest fields as build entrypoints (`default_popup`,
+`background.service_worker`, `content_scripts.*`, etc. — see `renderManifest` in
+the plugin source). It does **not** process the `icons` or `action.default_icon`
+fields at all, so manifest-referenced icons are never bundled. The plugin expects
+static assets to live in a **`public/` directory**, which it copies to `dist/`
+verbatim on every build.
+
+The previous session worked around this by hand-copying icons into
+`extension/dist/src/icons/`. But `dist/` is gitignored **and** the build runs with
+`emptyOutDir`, so those icons were wiped on the very next `npm run build` and never
+committed. Every fresh build silently broke extension loading again.
+
+**The fix (durable):**
+- Created `extension/public/src/icons/icon{16,32,48,128}.png` (tracked in git).
+- The build copies `public/` → `dist/` automatically, so `dist/src/icons/*` exists
+  after every `npm run build`. Matches the manifest paths (`src/icons/icon16.png`).
+- Removed the now-dead `extension/src/icons/` (the build never read it).
+
+Verified: clean `npm run build` produces `dist/src/icons/*`; the extension service
+worker registers in Playwright; all 3 e2e tests pass.
 
 ---
 
@@ -215,8 +244,14 @@ Accept that Playwright can't easily test the full capture pipeline, and instead:
 
 ## What to Do Next
 
-### Step 0 — Fix the Chrome launch crash (urgent)
-Try Option 1 (downgrade Playwright) or Option 2 (use system Chrome). Confirm `npm run e2e:extension` shows 3/3 passing before anything else.
+### Step 0 — Fix the Chrome launch crash (urgent) — ✅ DONE
+Resolved 2026-06-27. Root cause was missing `dist/` icons (not a Chrome crash);
+icons now live in `extension/public/src/icons/` and are copied on every build.
+`npm run e2e:extension` shows 3/3 passing. See "Resolution" section above.
+
+> Note: the earlier diagnosis (Playwright/Chromium 1228 regression, downgrade,
+> `channel: "chrome"`) was a red herring — Playwright's bundled Chromium launches
+> the extension fine once the icons are present. No Playwright/config change was needed.
 
 ### Step 1 — Test the full capture flow end-to-end
 Attempt Option A (`chrome.action.openPopup()`) first. If that doesn't work, try Option B (narrower host permission). If both fail, fall back to Option D (manual verification) and document it clearly.
@@ -235,7 +270,10 @@ The target behavior to test:
 Run `/security-review` on the extension source before shipping.
 
 ### Step 4 — Real icon assets
-Replace the 1×1 placeholder PNGs with actual branded icons (16, 32, 48, 128px).
+Replace the 1×1 placeholder PNGs in `extension/public/src/icons/` with actual
+branded icons (16, 32, 48, 128px). Keep them under `public/` so the build copies
+them to `dist/` automatically — do NOT put them in `src/icons/` (the build ignores
+that path).
 
 ### Step 5 — CI support
 The Playwright extension tests require `headless: false`. On Linux CI this needs `xvfb-run`. The extension tests are excluded from the main Playwright config (`playwright.config.ts`) — they need a separate CI job or `xvfb-run` wrapper.
