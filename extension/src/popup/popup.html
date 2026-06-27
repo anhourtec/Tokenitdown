@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>TokenItDown</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <div id="app">
+      <header>
+        <span class="logo">TokenItDown</span>
+      </header>
+
+      <main>
+        <button id="capture-btn" class="btn-primary">
+          Capture Full Page
+        </button>
+
+        <div id="status" class="status hidden">
+          <div id="status-text"></div>
+          <div id="progress-bar">
+            <div id="progress-fill"></div>
+          </div>
+        </div>
+
+        <div id="result" class="hidden">
+          <img id="preview" alt="Screenshot preview" />
+          <a id="download-link" download="screenshot.png" class="btn-secondary">
+            Download PNG
+          </a>
+        </div>
+
+        <div id="error" class="error hidden"></div>
+      </main>
+    </div>
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>
