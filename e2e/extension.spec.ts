@@ -9,52 +9,61 @@ const EXTENSION_PATH = path.resolve(__dirname, "../extension/dist")
 const EXTENSION_ID_RE = /^[a-p]{32}$/
 
 async function resolveExtensionId(context: BrowserContext): Promise<string> {
-  // Playwright's 'serviceworker' event does not fire for Chrome extension
-  // service workers in persistent contexts, so we read the ID from
-  // chrome://extensions/ by walking the shadow DOM.
+  // Strategy 1: read the ID from the service worker URL.
+  // Extension service workers register as chrome-extension://<id>/path.
+  // We poll context.serviceWorkers() because the SW event doesn't fire for
+  // Chrome extension workers in Playwright persistent contexts.
+  for (let i = 0; i < 20; i++) {
+    for (const sw of context.serviceWorkers()) {
+      const m = sw.url().match(/chrome-extension:\/\/([a-p]{32})\//)
+      if (m) return m[1]
+    }
+    await new Promise((r) => setTimeout(r, 500))
+  }
+
+  // Strategy 2: walk the shadow DOM on chrome://extensions/ as a fallback.
   const page = await context.newPage()
   try {
     await page.goto("chrome://extensions/")
-
-    // Wait until the custom element that hosts all extension cards is present.
-    // chrome:// pages don't emit standard load events, so avoid waitForLoadState.
     await page.waitForSelector("extensions-manager", { timeout: 15000 })
-    // Give Polymer/web-components time to render shadow roots and populate the list.
-    await page.waitForTimeout(3000)
 
-    const extensionId = await page.evaluate((idPattern: string): string | null => {
-      const re = new RegExp(idPattern)
-
-      // Walk light DOM + shadow DOM recursively looking for any element
-      // whose id matches the Chrome extension ID pattern (32 a-p chars).
-      function search(root: Element | ShadowRoot): string | null {
-        for (const el of root.querySelectorAll("[id]")) {
-          if (re.test(el.id)) return el.id
-        }
-        for (const el of root.querySelectorAll("*")) {
-          const sr = (el as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot
-          if (sr) {
-            const found = search(sr)
-            if (found) return found
+    // Poll until an element with a 32 a-p char id appears in the shadow DOM,
+    // or until 20 seconds have elapsed. Fixed waits are unreliable across machines.
+    const handle = await page.waitForFunction(
+      (idPattern: string): string | null => {
+        const re = new RegExp(idPattern)
+        function search(root: Element | ShadowRoot): string | null {
+          for (const el of root.querySelectorAll("[id]")) {
+            if (re.test(el.id)) return el.id
           }
+          for (const el of root.querySelectorAll("*")) {
+            const sr = (el as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot
+            if (sr) {
+              const found = search(sr)
+              if (found) return found
+            }
+          }
+          return null
         }
-        return null
-      }
-
-      // Must start from document.documentElement so that extensions-manager
-      // is found as a light-DOM element; calling querySelectorAll("*") on the
-      // extensions-manager Element itself never enters its own shadow root.
-      return search(document.documentElement)
-    }, EXTENSION_ID_RE.source)
-
-    if (!extensionId) {
+        // Must start from document.documentElement so that extensions-manager
+        // is found as a light-DOM element; calling querySelectorAll("*") on the
+        // extensions-manager Element itself never enters its own shadow root.
+        return search(document.documentElement)
+      },
+      EXTENSION_ID_RE.source,
+      { timeout: 20000, polling: 500 }
+    ).catch(async () => {
       await page.screenshot({ path: "test-results/extensions-page-debug.png", fullPage: true })
+      return null
+    })
+
+    if (!handle) {
       throw new Error(
         "TokenItDown extension not found on chrome://extensions/ — see test-results/extensions-page-debug.png"
       )
     }
 
-    return extensionId
+    return await handle.jsonValue() as string
   } finally {
     await page.close()
   }
