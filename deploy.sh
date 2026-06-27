@@ -25,6 +25,10 @@ if [ ! -f .env ]; then
   exit 1
 fi
 
+# Published web port (override WEB_PORT in .env if 3030 clashes on this host).
+WEB_PORT="$(grep -E '^WEB_PORT=' .env | head -1 | cut -d= -f2- | tr -d '[:space:]' || true)"
+WEB_PORT="${WEB_PORT:-3030}"
+
 echo ""
 echo "▶ Step 1: Stopping existing containers..."
 if [ -n "$(docker compose ps -q 2>/dev/null)" ]; then
@@ -54,6 +58,8 @@ docker compose ps
 
 echo ""
 echo "✓ Deployment complete!"
-echo "  Web      -> http://localhost:3020 (and http://192.168.69.16:3020 on the LAN)"
+echo "  Web      -> http://192.168.69.16:${WEB_PORT}  (host port ${WEB_PORT})"
 echo "  Postgres -> 192.168.69.16:5433    Redis -> 192.168.69.16:6386"
 echo "  Logs: docker compose logs -f web"
+echo ""
+echo "  If the web port is in use, set WEB_PORT (and match BETTER_AUTH_URL) in .env."
