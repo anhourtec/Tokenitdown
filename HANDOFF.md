@@ -57,13 +57,22 @@ is **Drizzle** (not Prisma as PLAN.md text says) — lighter, no engine binary.
 - `env.mjs` extended: DATABASE_URL, BETTER_AUTH_SECRET, BETTER_AUTH_URL,
   REDIS_URL, NEXT_PUBLIC_BETTER_AUTH_URL, `skipValidation` via SKIP_ENV_VALIDATION.
 
-**Data services (Docker) — Postgres + Redis only, NOT the web app:**
-- Per user: web is **not** containerised (run `npm run dev` locally). `docker-compose.yml`
-  runs only Postgres + Redis, intended to be deployed on **192.168.69.16**.
-- Ports differ from BookYourPTO-SaaS (5432/6385/3010) to coexist on that host:
-  **Postgres `5433:5432`, Redis `6386:6379`**. Redis uses `requirepass`.
-- `deploy.sh` (run on the server): stop if running → `docker compose pull` →
-  `up -d --force-recreate`. Mirrors BookYourPTO's `build.sh` pattern.
+**Docker — FULL stack (web + Postgres + Redis):**
+- `docker-compose.yml` builds the Next.js app (`Dockerfile`) and runs it
+  alongside Postgres + Redis, deployed on **192.168.69.16**.
+- Ports differ from BookYourPTO-SaaS (3010/5432/6385) to coexist on that host:
+  **Web `3020:3000`, Postgres `5433:5432`, Redis `6386:6379`**. Redis uses `requirepass`.
+- `deploy.sh` mirrors BookYourPTO's `build.sh`: stop → remove this project's old
+  images → `docker compose build --no-cache` → `up -d` → status.
+- **`scripts/docker-deploy.mjs`** is the web container's entrypoint (CMD): it
+  validates required env (DATABASE_URL, BETTER_AUTH_SECRET ≥32, BETTER_AUTH_URL),
+  waits for Postgres, ensures the DB + runs Drizzle migrations, then `next start`.
+  Inside compose the web talks to `postgres:5432` / `redis:6379` (overridden);
+  set `BETTER_AUTH_URL` in the server's `.env` to the public URL (e.g.
+  `http://192.168.69.16:3020`). The web image keeps full deps (incl. drizzle-kit).
+- You can still run the app locally with `npm run dev` against the same DB.
+- **CI removed:** deleted `.github/workflows/check.yml` (was failing; not needed
+  right now — re-add when ready).
 - `scripts/ensure-db.mjs` — creates the `tokenitdown` database if missing
   (exports a tested pure `resolveTargetDatabase` helper). npm scripts:
   `db:generate|migrate|push|studio|ensure|setup` (auto-load `.env` via
@@ -173,16 +182,18 @@ Ported the **sidebar design + home ("default") dashboard** from
 - That legacy install once pruned `@testing-library/dom` (a peer of
   `@testing-library/react` v16), breaking `screen` imports — it's now an explicit
   devDependency so it always resolves.
-- **Web is intentionally not dockerised** — `docker-compose.yml` is Postgres +
-  Redis only, deployed on 192.168.69.16; the app runs via `npm run dev`.
+- **Docker is now full-stack** (web + Postgres + Redis); `./deploy.sh` builds the
+  web image and deploys all three (see the "Docker — FULL stack" section above).
+  You can still run the app with `npm run dev` for local work.
 - `lib/db/schema.ts` column names are camelCase to match better-auth defaults;
   `drizzle.config.ts` sets `casing: "camelCase"`. Regenerate via the better-auth
   CLI if plugins change, then `npm run db:generate`.
 
 ## Next Steps
-1. **Deploy data services:** copy `.env.example` → `.env` on the server (192.168.69.16),
-   set real passwords, run `./deploy.sh`. Then locally: `npm run db:setup` (creates DB + migrates),
-   `npm run dev`, and verify signup → /dashboard → sign out in the browser (rule #6).
+1. **Deploy:** on the server (192.168.69.16) copy `.env.example` → `.env`, set real
+   passwords + `BETTER_AUTH_URL=http://192.168.69.16:3020`, run `./deploy.sh`
+   (builds the web image + brings up web/Postgres/Redis; migrations run on web
+   startup). App at `http://192.168.69.16:3020`. Locally you can `npm run dev`.
 2. **Layer the rest of auth (PLAN §4.6):** email verification, password reset,
    2FA (TOTP + email OTP), rate limiting, audit log, session rotation. better-auth
    has plugins for most of this — wire them in `lib/auth.ts` and regenerate the
@@ -193,8 +204,7 @@ Ported the **sidebar design + home ("default") dashboard** from
 5. Replace `lp-items.tsx` / landing page with TokenItDown product messaging; add
    nav links to /login and /signup.
 6. Confirm final product name (TokenItDown vs Markpipe vs Readymark).
-7. If the web app is later containerised, re-add a `Dockerfile` (was removed —
-   web runs via `npm run dev` for now).
+7. Re-add CI when ready (the `.github/workflows/check.yml` was removed).
 
 ---
 *To continue: start a fresh conversation and point the agent at `HANDOFF.md` (this file) and `CLAUDE.md`.*
