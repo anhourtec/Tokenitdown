@@ -10,6 +10,7 @@ import { Checkbox } from "../../components/ui/checkbox"
 import { Input } from "../../components/ui/input"
 import { Label } from "../../components/ui/label"
 import { Logo } from "../../components/ui/logo"
+import { PasswordInput } from "../../components/ui/password-input"
 import { signIn, signUp } from "../../lib/auth-client"
 
 type Mode = "login" | "register"
@@ -117,17 +118,16 @@ export function AuthForm({ mode }: { mode: Mode }) {
               <Label htmlFor="password" className="text-foreground text-sm font-medium">
                 Password
               </Label>
-              <Input
+              <PasswordInput
                 id="password"
                 name="password"
-                type="password"
                 autoComplete={isRegister ? "new-password" : "current-password"}
                 required
                 minLength={8}
                 placeholder="Password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="mt-2"
+                wrapperClassName="mt-2"
               />
             </div>
 
@@ -136,17 +136,16 @@ export function AuthForm({ mode }: { mode: Mode }) {
                 <Label htmlFor="confirm-password" className="text-foreground text-sm font-medium">
                   Confirm password
                 </Label>
-                <Input
+                <PasswordInput
                   id="confirm-password"
                   name="confirm-password"
-                  type="password"
                   autoComplete="new-password"
                   required
                   minLength={8}
                   placeholder="Password"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="mt-2"
+                  wrapperClassName="mt-2"
                 />
               </div>
             )}
