@@ -18,6 +18,10 @@ export const env = createEnv({
     // Redis connection string — reserved for the job queue (BullMQ) and a future
     // session store. Optional for the auth baseline (sessions live in Postgres).
     REDIS_URL: z.string().url().optional(),
+    // Extra comma-separated origins allowed by better-auth (CSRF / trusted
+    // origins) beyond BETTER_AUTH_URL. In dev the LAN URL is auto-added so
+    // others on your network can sign in. e.g. "http://192.168.1.20:3000".
+    TRUSTED_ORIGINS: z.string().optional(),
   },
   client: {
     // Base URL the browser auth client talks to. Defaults to the current origin
@@ -30,6 +34,7 @@ export const env = createEnv({
     BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET,
     BETTER_AUTH_URL: process.env.BETTER_AUTH_URL,
     REDIS_URL: process.env.REDIS_URL,
+    TRUSTED_ORIGINS: process.env.TRUSTED_ORIGINS,
     NEXT_PUBLIC_BETTER_AUTH_URL: process.env.NEXT_PUBLIC_BETTER_AUTH_URL,
   },
   // Allow `npm run build` / drizzle-kit and CI to run without a full env.

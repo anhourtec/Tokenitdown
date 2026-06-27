@@ -51,7 +51,14 @@ export const auth = betterAuth({
       },
     },
   },
-  trustedOrigins: [env.BETTER_AUTH_URL],
+  // BETTER_AUTH_URL plus any extra origins (e.g. the LAN URL injected in dev so
+  // others on the network can sign in).
+  trustedOrigins: [
+    env.BETTER_AUTH_URL,
+    ...(env.TRUSTED_ORIGINS?.split(",")
+      .map((o: string) => o.trim())
+      .filter(Boolean) ?? []),
+  ],
   // nextCookies() must be the last plugin: it lets server actions set cookies.
   plugins: [nextCookies()],
 })
