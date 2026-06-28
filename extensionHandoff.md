@@ -1,6 +1,6 @@
 # Extension Testing Handoff
 
-**Last updated:** 2026-06-27 (after M4 — clean stage: boilerplate strip + token report)
+**Last updated:** 2026-06-27 (after M5 — CDP single-pass screenshot capture, primary path)
 **Branch:** `extension`
 **Scope:** Testing the Chrome extension (`extension/`) — what was done, what works, what's still unverified, and exactly where to continue.
 
@@ -17,8 +17,9 @@ The Chrome MV3 extension lives entirely under `extension/`. It captures a full-p
 | `src/popup/popup.ts` + `popup.html` + `popup.css` | Extension popup UI: capture button, progress bar, preview image, download link, error display |
 | `src/service-worker.ts` | Background worker — receives `START_CAPTURE` from the popup, orchestrates scroll → capture → stitch |
 | `src/content-script.ts` | Injected into every page — responds to scroll/metrics/hide-fixed messages **and `EXTRACT_MARKDOWN`** from the service worker |
-| `src/lib/screenshot.ts` | Pure logic: `captureFrames()` — scrolls top-to-bottom in viewport steps, calls injected callbacks |
-| `src/lib/stitch.ts` | Pure logic: `stitch()` — composites frames onto an `OffscreenCanvas`, returns a PNG data URL |
+| `src/lib/captureCDP.ts` | M5: `captureFullPageCDP(session)` — single-pass full-page screenshot via the DevTools Protocol (attach → `Page.getLayoutMetrics` → `Page.captureScreenshot` w/ `captureBeyondViewport` → detach). **Primary** capture path; CDP transport injected for testability |
+| `src/lib/screenshot.ts` | Pure logic: `captureFrames()` — scrolls top-to-bottom in viewport steps, calls injected callbacks. **Fallback** path when CDP can't attach |
+| `src/lib/stitch.ts` | Pure logic: `stitch()` — composites frames onto an `OffscreenCanvas`, returns a PNG data URL (fallback path) |
 | `src/lib/extract.ts` | Pure logic: `extractMarkdown(doc, url)` — Readability main-content extraction → Turndown (GFM) → clean Markdown. Returns `ExtractResult` |
 | `src/lib/route.ts` | M2 router: `collectSignals(doc, extract)` reads DOM signals (text length, readability, canvas/svg/img counts + area ratios, link density); pure `decideRoute(signals)` → `RouteDecision` (`dom` / `vision` / `hybrid`) |
 | `src/lib/regions.ts` | M3: `collectRegions(doc)` finds visual regions (canvas/svg/figure/img, size-filtered, deduped) with page rects + labels; `injectPlaceholders(clone, regions)` puts inline tokens at each region's spot; `spliceDescriptions(md, descs)` swaps tokens for descriptions |
@@ -34,7 +35,7 @@ The Chrome MV3 extension lives entirely under `extension/`. It captures a full-p
 cd extension && npm run build     # rebuilds dist/ (copies public/ → dist/, incl. icons)
 cd extension && npm run typecheck # zero TS errors
 # unit tests run from the repo root via Vitest:
-npx vitest run extension/src/lib   # screenshot 7 + extract 6 + route 12 + regions 9 + crop 6 + describe 5 + clean 6 + tokens 7 = 58 tests
+npx vitest run extension/src/lib   # screenshot 7 + extract 6 + route 12 + regions 9 + crop 6 + describe 5 + clean 6 + tokens 7 + captureCDP 5 = 63 tests
 npm run e2e:extension              # 3 Playwright e2e tests (loads the unpacked extension)
 ```
 
@@ -51,12 +52,14 @@ npm run e2e:extension              # 3 Playwright e2e tests (loads the unpacked 
 | `extension/src/lib/route.test.ts` — 12 unit tests (M2 router) | ✅ All pass |
 | `extension/src/lib/{regions,crop,describe}.test.ts` — 20 unit tests (M3) | ✅ All pass |
 | `extension/src/lib/{clean,tokens}.test.ts` — 13 unit tests (M4) | ✅ All pass |
-| `e2e/extension.spec.ts` — 3 Playwright e2e tests | ✅ All pass (1.7s) |
+| `extension/src/lib/captureCDP.test.ts` — 5 unit tests (M5) | ✅ All pass |
+| `e2e/extension.spec.ts` — 3 Playwright e2e tests | ✅ All pass (3.4s) |
 | `playwright.extension.config.ts` + npm script | ✅ In place |
 | M1 DOM→Markdown — live-verified in real Chrome + security review | ✅ Clean |
 | M2 router — live-verified in real Chrome (3/3 routes) + security review | ✅ Clean |
 | M3 hybrid region crop + inline describe — live-verified + security review | ✅ Clean |
 | M4 clean stage + token report — popup UI live-verified + security review | ✅ Clean |
+| M5 CDP single-pass capture — live-verified in real Chrome + security review | ✅ Clean |
 
 ### Resolution of the "Chrome launch crash" (session 2026-06-27)
 
@@ -338,15 +341,19 @@ This section records what those tools do and the concrete defects in our pipelin
 
 ### Plan
 
-**Strategy A — Add a CDP capture path (recommended; biggest quality jump, least code).**
-1. Add `"debugger"` to manifest permissions.
-2. New `lib/captureCDP.ts`: `attach` → `Page.enable` → `Page.getLayoutMetrics`
-   (read `cssContentSize` for true full dimensions) → optionally
-   `Emulation.setDeviceMetricsOverride` to pin `deviceScaleFactor` →
-   `Page.captureScreenshot({ captureBeyondViewport: true, clip })` → `detach`.
-3. Make it the **primary** path; fall back to scroll-stitch when attach fails or
-   the page is restricted (`chrome://`, store, user declines).
-4. Playwright e2e: capture a tall page, assert output dimensions ≈ `cssContentSize`.
+**Strategy A — Add a CDP capture path (recommended; biggest quality jump, least code).** ✅ SHIPPED in M5 (2026-06-27).
+1. ~~Add `"debugger"` to manifest permissions.~~ Done.
+2. ~~New `lib/captureCDP.ts`: `attach` → `Page.enable` → `Page.getLayoutMetrics`
+   (read `cssContentSize`) → `Page.captureScreenshot({ captureBeyondViewport: true, clip })`
+   → `detach`.~~ Done. (Did **not** use `Emulation.setDeviceMetricsOverride` to pin
+   the scale — that would relayout the page and shift region positions vs what the
+   content script measured. Instead, crop scale is now measured from the produced
+   image; see the M5 milestone note on the DPR finding.)
+3. ~~Make it **primary**; fall back to scroll-stitch when attach fails / page restricted.~~ Done.
+4. ~~Playwright e2e: capture a tall page, assert output dimensions.~~ Done — live-verified
+   (5208px single-pass capture of a 720px-viewport page). This also fixes defects
+   #1, #2, #3, #5, #6, #7 above (seams, DPR resample, scrollbar, sub-pixel seams,
+   dropped fixed header, lazy-content settle) for the primary path in one move.
 
 **Strategy B — Harden the scroll-stitch fallback to GoFullPage parity** (no-banner mode + restricted pages):
 1. Throttle captures to ≥500ms **and** catch the quota error with retry/backoff (#1).
@@ -602,12 +609,59 @@ on top later; the seam is the same `cleanMarkdown` call site in the service work
   string/arithmetic (no DOM, no dynamic `RegExp` from page content); the cleaned
   Markdown stays download-only; the popup stat is `textContent` of numbers.
 
-**Next milestones:**
-- **M4b (optional) — AI prune.** An LLM pass over the cleaned Markdown for deeper
-  boilerplate/redundancy removal, behind the same call site. Needs the same
-  provider decision as M3b.
-- **M5 — Screenshot quality (Strategy A, CDP).** Matters more now: crops feed M3.
-- Wire `page.md` + `screenshot.png` (+ a11y tree) into the authenticated bundle
-  upload (PLAN.md §4.4).
-- **M5 — Screenshot quality (Strategy A CDP).** Matters more now: crops feed M3.
-- Wire `page.md` + `screenshot.png` into the authenticated bundle upload (PLAN.md).
+**Next milestones:** see M5 below, then the bundle upload.
+
+### Milestone M5 — CDP Single-Pass Screenshot ✅ DONE (2026-06-27)
+
+Adds a Chrome DevTools Protocol capture path (`chrome.debugger`) as the **primary**
+way to screenshot a page — one compositor pass for the whole page, no scrolling.
+This is Strategy A from the capture-quality plan above.
+
+**What was built:**
+- `lib/captureCDP.ts` — `captureFullPageCDP(session)`: `attach` → `Page.enable` →
+  `Page.getLayoutMetrics` (read `cssContentSize`) → `Page.captureScreenshot({
+  format:"png", captureBeyondViewport:true, clip })` → `detach` (in `finally`,
+  always). The CDP transport is injected as a `CdpSession`, so the orchestration is
+  unit-testable without a browser. Every CDP method name + param is a static
+  literal (no page data selects a command — see security note).
+- `manifest.json` — added the `"debugger"` permission.
+- `service-worker.ts` — `captureScreenshot(tab, metrics)` tries CDP first
+  (`cdpSession(tab.id)` wraps `chrome.debugger`); on **any** failure (restricted
+  page like `chrome://`/Web Store, DevTools already attached, user declines) it
+  falls back to the existing scroll-stitch (which still hides fixed elements).
+  Logs which path ran.
+- `lib/crop.ts` — **important fix surfaced by M5:** the CDP capture renders at a
+  device scale factor that is **not** necessarily `window.devicePixelRatio` (live
+  test: capture was 1.5× while `devicePixelRatio` reported 1.0). M3's crop math
+  multiplied region rects by `devicePixelRatio`, which would mis-crop CDP shots.
+  `cropRegions` now **measures** the scale from `img.width / cssPageWidth`
+  (`metrics.scrollWidth`), correct for both CDP and stitch images. `regionPixelRect`
+  param renamed `devicePixelRatio` → `scale`.
+
+**Verification:**
+- `npx vitest run extension/src/lib` — **63/63 pass** (M5 adds 5: captureCDP —
+  command sequence + `captureBeyondViewport`/`clip` from `cssContentSize`,
+  detach-always-on-error, `cssContentSize`→`contentSize` fallback, throw on empty
+  size, attach-failure short-circuit).
+- **Live-verified in real Chrome** (the CDP path needs no `activeTab` gesture, so
+  unlike `captureVisibleTab` it *is* drivable headless): captured a tall page
+  (60 rows, fixed header) — single-pass image **5208px tall** vs a 720px viewport,
+  **uniform** 1.5× scale on both axes, non-empty PNG. This both proves the capture
+  and is what flagged the DPR/scale finding above.
+- `npm run build` + `typecheck` clean; `e2e/extension.spec.ts` still 3/3 (extension
+  loads fine with the `debugger` permission).
+- `/security-review` — **clean, no findings.** The `debugger` permission is used in
+  a tightly constrained way: static CDP commands only (no `Runtime.evaluate`/eval),
+  the debuggee is always the user's own active tab (never page-chosen), detach is
+  guaranteed, and the screenshot stays preview/download/crop-only (no network sink).
+
+**Trade-offs / notes:**
+- CDP shows the yellow "DevTools is debugging this browser" banner during capture,
+  needs the `debugger` permission (scarier install prompt), and can't capture
+  `chrome://`/Web Store pages — all handled by the scroll-stitch fallback.
+- **Strategy B (harden the scroll-stitch fallback)** is still open — worth doing so
+  the no-banner / restricted-page path reaches GoFullPage parity (defects #1–#7).
+
+**Then — bundle upload.** Wire `page.md` + `screenshot.png` (+ a11y tree) into the
+authenticated platform upload (PLAN.md §4.4). And the optional **M3b/M4b** LLM
+providers (vision describe / AI prune), both gated on the same provider decision.

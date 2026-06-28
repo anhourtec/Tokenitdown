@@ -9,6 +9,7 @@ import type {
 } from "./types";
 import { stitch } from "./lib/stitch";
 import { captureFrames } from "./lib/screenshot";
+import { captureFullPageCDP, type CdpSession } from "./lib/captureCDP";
 import { cropRegions } from "./lib/crop";
 import { describeRegions, metadataDescriber } from "./lib/describe";
 import { spliceDescriptions } from "./lib/regions";
@@ -63,28 +64,8 @@ async function handleStartCapture() {
     // scrolling/hiding elements, so the analysis sees the page in its natural state.
     const analysis = await requestMarkdown(tab.id);
 
-    // Hide fixed elements so they don't repeat in every frame
-    await sendToContent(tab.id, { type: "HIDE_FIXED_ELEMENTS" });
-
-    // Capture all frames by scrolling top to bottom
-    const frames = await captureFrames({
-      tabId: tab.id,
-      metrics,
-      settleMs: SCROLL_SETTLE_MS,
-      onProgress: (frame, total) =>
-        sendToPopup({ type: "CAPTURE_PROGRESS", frame, total }),
-      scrollTo: (y) => sendToContent(tab.id!, { type: "SCROLL_TO", y }),
-      waitForScrollDone: () => waitForScrollDone(tab.id!),
-      captureTab: () =>
-        chrome.tabs.captureVisibleTab(tab.windowId, { format: "png" }),
-    });
-
-    // Restore fixed elements and scroll position
-    await sendToContent(tab.id, { type: "RESTORE_FIXED_ELEMENTS" });
-    await sendToContent(tab.id, { type: "SCROLL_TO", y: 0 });
-
-    // Stitch frames into a single PNG
-    const dataUrl = await stitch(frames, metrics);
+    // M5 — capture the full page (CDP single-pass primary, scroll-stitch fallback).
+    const dataUrl = await captureScreenshot(tab, metrics);
 
     // M3 — on hybrid pages, crop each visual region from the screenshot, describe
     // it, and splice the description into the Markdown where its placeholder sits.
@@ -129,6 +110,61 @@ function handleCancel() {
   activeTabId = null;
 }
 
+/**
+ * Produces the full-page PNG. M5: tries the CDP single-pass capture first (no
+ * seams, captures fixed headers, single DPR pass); on any failure — restricted
+ * page, DevTools already attached, user-declined — falls back to the
+ * scroll-and-stitch path (which hides fixed elements to avoid duplicating them).
+ */
+async function captureScreenshot(
+  tab: chrome.tabs.Tab,
+  metrics: PageMetrics
+): Promise<string> {
+  const tabId = tab.id!;
+
+  try {
+    const { dataUrl } = await captureFullPageCDP(cdpSession(tabId));
+    console.log("[TokenItDown] capture path: CDP single-pass");
+    return dataUrl;
+  } catch (err) {
+    console.warn(
+      "[TokenItDown] CDP capture unavailable, falling back to scroll-stitch:",
+      err
+    );
+  }
+
+  await sendToContent(tabId, { type: "HIDE_FIXED_ELEMENTS" });
+  const frames = await captureFrames({
+    tabId,
+    metrics,
+    settleMs: SCROLL_SETTLE_MS,
+    onProgress: (frame, total) =>
+      sendToPopup({ type: "CAPTURE_PROGRESS", frame, total }),
+    scrollTo: (y) => sendToContent(tabId, { type: "SCROLL_TO", y }),
+    waitForScrollDone: () => waitForScrollDone(tabId),
+    captureTab: () =>
+      chrome.tabs.captureVisibleTab(tab.windowId, { format: "png" }),
+  });
+  await sendToContent(tabId, { type: "RESTORE_FIXED_ELEMENTS" });
+  await sendToContent(tabId, { type: "SCROLL_TO", y: 0 });
+
+  console.log("[TokenItDown] capture path: scroll-stitch");
+  return stitch(frames, metrics);
+}
+
+/** A `CdpSession` backed by `chrome.debugger` for the given tab. */
+function cdpSession(tabId: number): CdpSession {
+  const target: chrome.debugger.Debuggee = { tabId };
+  return {
+    attach: () => chrome.debugger.attach(target, "1.3"),
+    // Swallow detach errors — by the time we detach the capture already
+    // succeeded or failed, and a missing attachment is not actionable.
+    detach: () => chrome.debugger.detach(target).catch(() => {}),
+    send: <T>(method: string, params?: object) =>
+      chrome.debugger.sendCommand(target, method, params) as Promise<T>,
+  };
+}
+
 function requestPageMetrics(tabId: number): Promise<PageMetrics> {
   return new Promise((resolve, reject) => {
     const timeout = setTimeout(
@@ -164,7 +200,9 @@ async function describeRegionsInline(
 ): Promise<string> {
   if (regions.length === 0) return markdown;
   try {
-    const crops = await cropRegions(screenshotDataUrl, regions, metrics);
+    // Scale is derived inside cropRegions from the image width vs this CSS width,
+    // so it's correct for both the CDP and stitch screenshots.
+    const crops = await cropRegions(screenshotDataUrl, regions, metrics.scrollWidth);
     const cropById = new Map(crops.map((c) => [c.id, c]));
     const descriptions = await describeRegions(regions, cropById, metadataDescriber);
     return spliceDescriptions(markdown, descriptions);

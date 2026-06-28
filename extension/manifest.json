@@ -3,7 +3,7 @@
   "name": "TokenItDown",
   "version": "0.1.0",
   "description": "Capture any web page as a full-page screenshot.",
-  "permissions": ["activeTab", "scripting", "storage"],
+  "permissions": ["activeTab", "scripting", "storage", "debugger"],
   "action": {
     "default_popup": "src/popup/popup.html",
     "default_title": "Capture with TokenItDown",
