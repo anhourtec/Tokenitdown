@@ -1,6 +1,17 @@
 import type { PopupMessage, RouteDecision, TokenStats, WorkerMessage } from "../types";
+import {
+  PLATFORM_TARGETS,
+  getPlatformBaseUrl,
+  setPlatformBaseUrl,
+} from "../lib/config";
 
 const captureBtn = document.getElementById("capture-btn") as HTMLButtonElement;
+const saveBtn = document.getElementById("save-btn") as HTMLButtonElement;
+const targetSelect = document.getElementById("target-select") as HTMLSelectElement;
+const saveStatus = document.getElementById("save-status") as HTMLDivElement;
+const saveResult = document.getElementById("save-result") as HTMLDivElement;
+const saveDownloadMd = document.getElementById("save-download-md") as HTMLAnchorElement;
+const openLibrary = document.getElementById("open-library") as HTMLAnchorElement;
 const statusEl = document.getElementById("status") as HTMLDivElement;
 const statusText = document.getElementById("status-text") as HTMLDivElement;
 const progressFill = document.getElementById("progress-fill") as HTMLDivElement;
@@ -33,12 +44,48 @@ port.onMessage.addListener((msg: WorkerMessage) => {
     case "CAPTURE_ERROR":
       showError(msg.error);
       break;
+
+    case "SAVE_PROGRESS":
+      setSaveStatus("Converting & saving to your library…");
+      break;
+
+    case "SAVE_DONE":
+      showSaveResult(msg.markdown, msg.title, msg.baseUrl);
+      break;
+
+    case "SAVE_ERROR":
+      showSaveError(msg.error, msg.needsLogin, msg.loginUrl);
+      break;
   }
 });
 
 captureBtn.addEventListener("click", () => {
   startCapture();
 });
+
+saveBtn.addEventListener("click", () => {
+  saveBtn.disabled = true;
+  saveResult.classList.add("hidden");
+  setSaveStatus("Reading page…");
+  send({ type: "SAVE_TO_LIBRARY" });
+});
+
+// Populate the convert-target selector from env-configured platforms.
+void initTargetSelect();
+
+async function initTargetSelect() {
+  const current = await getPlatformBaseUrl();
+  for (const target of PLATFORM_TARGETS) {
+    const opt = document.createElement("option");
+    opt.value = target.url;
+    opt.textContent = `${target.label} (${target.url})`;
+    if (target.url === current) opt.selected = true;
+    targetSelect.append(opt);
+  }
+  targetSelect.addEventListener("change", () => {
+    void setPlatformBaseUrl(targetSelect.value);
+  });
+}
 
 function startCapture() {
   captureBtn.disabled = true;
@@ -107,6 +154,47 @@ function showTokens(tokens: TokenStats) {
       ? `≈ ${after} tokens · −${tokens.savedPct}% after cleaning`
       : `≈ ${after} tokens`;
   tokenStats.classList.remove("hidden");
+}
+
+// Object URL backing the saved Markdown download (revoked on replacement).
+let saveMdObjectUrl: string | null = null;
+
+function setSaveStatus(text: string) {
+  saveStatus.textContent = text;
+  saveStatus.classList.remove("hidden", "is-error");
+}
+
+/** Shows the saved-to-library result: a Markdown download + a link to the library. */
+function showSaveResult(markdown: string, title: string | null, baseUrl: string) {
+  saveBtn.disabled = false;
+  saveStatus.classList.add("hidden");
+
+  if (saveMdObjectUrl) URL.revokeObjectURL(saveMdObjectUrl);
+  saveMdObjectUrl = URL.createObjectURL(new Blob([markdown], { type: "text/markdown" }));
+  saveDownloadMd.href = saveMdObjectUrl;
+  saveDownloadMd.download = `${slugify(title ?? "") || "page"}.md`;
+
+  openLibrary.href = `${baseUrl.replace(/\/+$/, "")}/dashboard/library`;
+  saveResult.classList.remove("hidden");
+}
+
+function showSaveError(message: string, needsLogin: boolean, loginUrl?: string) {
+  saveBtn.disabled = false;
+  saveResult.classList.add("hidden");
+  saveStatus.classList.remove("hidden");
+  saveStatus.classList.add("is-error");
+  saveStatus.textContent = needsLogin
+    ? `${message}${loginUrl ? "" : ""}`
+    : `Error: ${message}`;
+
+  if (needsLogin && loginUrl) {
+    const a = document.createElement("a");
+    a.href = loginUrl;
+    a.target = "_blank";
+    a.rel = "noopener";
+    a.textContent = " Open sign-in";
+    saveStatus.append(a);
+  }
 }
 
 /** Turns a page title into a safe, lowercase filename stem. */

@@ -1,10 +1,14 @@
 # Extension Handoff
 
-**Updated:** 2026-06-27 (M1–M5 shipped; content-script path bug fixed; first manual run done)
+**Updated:** 2026-06-27 (M1–M5 + path fix + Readability coverage fix shipped & pushed; `main`
+merged in; **"Save to TokenItDown" platform-save built — uncommitted**)
 **Branch:** `extension`
 **What this is:** A Chrome MV3 extension under `extension/` that turns a web page into
-clean, LLM-ready Markdown **plus** a full-page screenshot. Pipeline: capture → route
-(DOM/vision/hybrid) → describe visual regions → clean + token-report → download.
+clean, LLM-ready Markdown **plus** a full-page screenshot. Two output paths:
+1. **Local pipeline** — capture → route (DOM/vision/hybrid) → describe visual regions →
+   clean + token-report → download PNG/Markdown.
+2. **Save to TokenItDown** — send the page's rendered HTML to the platform (`/api/convert`,
+   markitdown) and save it to the signed-in user's library. See "Platform integration" below.
 
 ---
 
@@ -12,9 +16,9 @@ clean, LLM-ready Markdown **plus** a full-page screenshot. Pipeline: capture →
 
 | File | Purpose |
 |------|---------|
-| `popup/popup.{ts,html,css}` | Popup UI: capture button, progress, preview, route badge, token line, PNG + Markdown downloads |
-| `service-worker.ts` | Orchestrates the capture flow on `START_CAPTURE` (extract → screenshot → describe → clean → `CAPTURE_DONE`) |
-| `content-script.ts` | Auto-injected (`<all_urls>`); answers `GET_PAGE_METRICS` / `SCROLL_TO` / `HIDE_FIXED` / `EXTRACT_MARKDOWN`. `analyzePage()` runs M1+M2(+M3 placeholders) |
+| `popup/popup.{ts,html,css}` | Popup UI: "Capture Full Page" (local pipeline) + "Save page to TokenItDown" (platform) + "Convert via" target selector, progress, preview, route badge, token line, downloads |
+| `service-worker.ts` | Orchestrates `START_CAPTURE` (extract → screenshot → describe → clean → `CAPTURE_DONE`) and `SAVE_TO_LIBRARY` (`handleSaveToLibrary` → platform) |
+| `content-script.ts` | Auto-injected (`<all_urls>`); answers `GET_PAGE_METRICS` / `SCROLL_TO` / `HIDE_FIXED` / `EXTRACT_MARKDOWN` / `GET_PAGE_HTML`. `analyzePage()` runs M1+M2(+M3 placeholders) |
 | `lib/captureCDP.ts` | **M5, primary capture.** `captureFullPageCDP(session)` — DevTools-Protocol single-pass screenshot (attach → `Page.captureScreenshot` w/ `captureBeyondViewport` → detach). CDP transport injected for testability |
 | `lib/screenshot.ts` + `lib/stitch.ts` | **Fallback capture.** Scroll in viewport steps → composite frames on `OffscreenCanvas`. Used when CDP can't attach |
 | `lib/extract.ts` | **M1.** `extractMarkdown(doc,url)` — Readability → Turndown(GFM); falls back to `<body>`. Returns `ExtractResult` (incl. `source`, `readerable`, `textLength`) |
@@ -24,14 +28,16 @@ clean, LLM-ready Markdown **plus** a full-page screenshot. Pipeline: capture →
 | `lib/describe.ts` | **M3.** `RegionDescriber` interface + default `metadataDescriber` (caption/alt/dims, no model) + `describeRegions()` |
 | `lib/clean.ts` | **M4.** `cleanMarkdown(md)` — boilerplate strip + dedupe (guards headings/blockquotes) |
 | `lib/tokens.ts` | **M4.** `estimateTokens(text)` (~4 chars/token) + `tokenSavings(before,after)` |
-| `types.ts` | Shared message + data interfaces. `types/turndown-plugin-gfm.d.ts` — decl for the untyped plugin |
+| `lib/platform.ts` | **Platform save.** `convertHtmlToLibrary({baseUrl,html,filename})` — POST rendered HTML to `{base}/api/convert` (`credentials:include`); markitdown converts + saves to the library. `PlatformError` (`needsLogin` on 401) |
+| `lib/config.ts` | Platform base URLs from `import.meta.env.VITE_*` (no hardcoded URLs) + per-user override in `chrome.storage` |
+| `types.ts` | Shared message + data interfaces. `types/turndown-plugin-gfm.d.ts` — decl for the untyped plugin; `vite-env.d.ts` — `import.meta.env` typing |
 
 ## Build & test
 ```bash
 cd extension && npm run build      # rebuilds dist/ (copies public/ → dist/, incl. icons)
 cd extension && npm run typecheck  # zero TS errors
 # from repo root:
-npx vitest run extension/src/lib   # 68 unit tests (screenshot7 extract11 route12 regions9 crop6 describe5 clean6 tokens7 captureCDP5)
+npx vitest run extension/src/lib   # 73 unit tests (…+ platform5). Extension reads VITE_TOKENITDOWN_* from the repo-root .env (envDir: "..")
 npm run e2e:extension              # 3 Playwright e2e (loads the unpacked extension)
 ```
 
@@ -39,12 +45,21 @@ npm run e2e:extension              # 3 Playwright e2e (loads the unpacked extens
 
 ## Status
 
-All of **M1–M5 are done, security-reviewed clean, and live-verified in real Chrome.**
-63 unit + 3 e2e green; typecheck + build clean. Committed M1–M5 + the path fix and pushed.
+**M1–M5, the content-script path fix, and the Readability coverage fix are done,
+security-reviewed clean, live-verified, committed AND pushed** (local `extension` ==
+`origin/extension`). `main` (the Next.js app + markitdown conversion service) is merged in.
 
-**Manual testing works** for normal pages: the toolbar **Capture Full Page** → screenshot
-preview + route badge + token line + PNG/Markdown downloads. (Rebuild + reload the
-extension at `chrome://extensions` after any change.)
+**The "Save to TokenItDown" platform-save feature is built and verified but UNCOMMITTED**
+(working tree): `lib/platform.ts` (+test), `lib/config.ts`, `vite-env.d.ts`, and changes to
+`manifest.json`, `vite.config.ts`, `content-script.ts`, `service-worker.ts`, `popup.*`,
+`types.ts`, `.env.example`. Security-reviewed clean. Suggested commits: (1) env/config wiring,
+(2) the feature.
+
+**73 unit + 3 e2e green; typecheck + build clean.**
+
+**Manual testing works** for normal pages: toolbar **Capture Full Page** → screenshot +
+route badge + token line + downloads; and **Save page to TokenItDown** → library (needs you
+signed into the dashboard). Rebuild + reload at `chrome://extensions` after any change.
 
 **Two open caveats** (details below): full button→download flow isn't auto-tested (needs
 a toolbar gesture Playwright can't fake), and scroll-animated marketing sites distort the
@@ -185,6 +200,34 @@ Refs: [CDP captureBeyondViewport](https://screenshotone.com/blog/capture-beyond-
   platform upload (PLAN.md §4.4).
 - **CI** — extension e2e needs `headless:false`; on Linux CI wrap with `xvfb-run` (separate job).
 
+## Platform integration — "Save page to TokenItDown" (done)
+
+The extension can send a page to the platform's conversion engine and save it to the
+signed-in user's library, reusing the **same better-auth session** as the dashboard.
+
+- **Flow:** popup "Save page to TokenItDown" → SW `handleSaveToLibrary` → content script
+  `GET_PAGE_HTML` returns `document.documentElement.outerHTML` (the **live, hydrated** DOM,
+  so SPA/auth-gated/dynamic content is included) → `convertHtmlToLibrary` POSTs it as an
+  `.html` file to `{base}/api/convert` → markitdown converts + `saveDocument` stores it →
+  popup shows Download Markdown + Open Library.
+- **Auth (verified):** `host_permissions` for the platform origins + `fetch(..., {credentials:
+  "include"})` makes the browser attach the better-auth session cookie to the extension's
+  cross-site request — the `sameSite=lax` cookie DOES reach it (de-risk-tested live; the
+  `/api/convert` route just needs the session cookie, no Origin/CSRF check on `getSession`).
+- **Config (no hardcoded URLs):** `VITE_TOKENITDOWN_BASE_URL` (prod) + `VITE_TOKENITDOWN_DEV_URL`
+  (localhost) live in the repo-root `.env` (documented in `.env.example`); `vite.config.ts`
+  has `envDir: ".."` so the build inlines them via `import.meta.env`. The popup "Convert via"
+  selector switches between them (stored in `chrome.storage`). ⚠️ `manifest.json`
+  `host_permissions` must mirror these origins (Chrome needs literal match patterns).
+- **Verified live against the deployed site** (`https://tokenitdown.anhourtec.com`): registered
+  an account, saved example.com (→ `# Example Domain`) and iotkinect.com (313 KB rendered HTML
+  → 15.4 k-char Markdown incl. footer + solution cards). 401 → "sign in" prompt. Popup UI
+  checked in real Chrome. `platform.test.ts` covers `convertHtmlToLibrary` (success / trailing
+  slash / 401-needsLogin / server error / network error).
+- **Note:** this is the rendered-HTML path the user chose over `/convert-url` (which fetches
+  raw HTML server-side with no JS). markitdown converts the whole document (no Readability),
+  similar to the M1 full-body path.
+
 ## Open decisions
 
 - **LLM provider location** (gates M3b vision-describe and M4b AI-prune — both plug into the
@@ -197,5 +240,8 @@ Refs: [CDP captureBeyondViewport](https://screenshotone.com/blog/capture-beyond-
 Untrusted page content (Markdown, region labels, descriptions) only ever lands in the
 **download-only** `text/markdown` Blob — never rendered as HTML anywhere in the extension.
 The popup shows only numeric stats (`textContent`). `chrome.debugger` uses static CDP
-commands against the user's own active tab, always detaches, no network sink. ⚠️ If a future
-milestone renders Markdown as HTML in-popup, sanitize it (DOMPurify) first.
+commands against the user's own active tab, always detaches. The only network sink is the
+"Save to TokenItDown" fetch: it sends the page HTML + session cookie ONLY to the
+`host_permissions` origins (prod/localhost), and the base URL comes from env / extension-only
+`chrome.storage` (a web page can't change it). ⚠️ If a future milestone renders Markdown as
+HTML in-popup, sanitize it (DOMPurify) first.

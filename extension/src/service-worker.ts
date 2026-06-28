@@ -2,6 +2,7 @@ import type {
   CapturedFrame,
   ContentToWorkerMessage,
   PageAnalysis,
+  PageHtml,
   PageMetrics,
   PopupMessage,
   WorkerMessage,
@@ -15,6 +16,8 @@ import { describeRegions, metadataDescriber } from "./lib/describe";
 import { spliceDescriptions } from "./lib/regions";
 import { cleanMarkdown } from "./lib/clean";
 import { estimateTokens, tokenSavings } from "./lib/tokens";
+import { convertHtmlToLibrary, PlatformError } from "./lib/platform";
+import { getPlatformBaseUrl } from "./lib/config";
 
 // Delay between scroll and capture to let lazy-loaded content settle
 const SCROLL_SETTLE_MS = 150;
@@ -31,6 +34,7 @@ chrome.runtime.onConnect.addListener((port) => {
   port.onMessage.addListener((msg: PopupMessage) => {
     if (msg.type === "START_CAPTURE") handleStartCapture();
     if (msg.type === "CANCEL_CAPTURE") handleCancel();
+    if (msg.type === "SAVE_TO_LIBRARY") handleSaveToLibrary();
   });
 });
 
@@ -110,6 +114,77 @@ async function handleStartCapture() {
 function handleCancel() {
   // TODO: implement cancellation via AbortSignal in Phase 2
   activeTabId = null;
+}
+
+/**
+ * Sends the current page's rendered HTML to the TokenItDown platform, which
+ * converts it (markitdown) and saves it to the signed-in user's library. Auth is
+ * the user's existing better-auth session (cookie sent via `credentials:include`).
+ */
+async function handleSaveToLibrary() {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!tab?.id) {
+    sendToPopup({ type: "SAVE_ERROR", error: "No active tab found.", needsLogin: false });
+    return;
+  }
+
+  const baseUrl = await getPlatformBaseUrl();
+  try {
+    sendToPopup({ type: "SAVE_PROGRESS" });
+
+    // Ensure the content script is present (covers tabs opened before install).
+    await chrome.scripting
+      .executeScript({ target: { tabId: tab.id }, files: ["src/content-script.js"] })
+      .catch(() => {});
+
+    const page = (await sendToContent(tab.id, { type: "GET_PAGE_HTML" })) as PageHtml;
+    const doc = await convertHtmlToLibrary({
+      baseUrl,
+      html: page.html,
+      filename: htmlFilename(page),
+    });
+
+    sendToPopup({
+      type: "SAVE_DONE",
+      id: doc.id,
+      title: doc.title,
+      markdown: doc.markdown,
+      baseUrl,
+    });
+  } catch (err) {
+    if (err instanceof PlatformError) {
+      sendToPopup({
+        type: "SAVE_ERROR",
+        error: err.message,
+        needsLogin: err.needsLogin,
+        loginUrl: err.needsLogin ? `${baseUrl}/login` : undefined,
+      });
+    } else {
+      sendToPopup({
+        type: "SAVE_ERROR",
+        error: err instanceof Error ? err.message : String(err),
+        needsLogin: false,
+      });
+    }
+  }
+}
+
+/** A safe `<slug>.html` filename from the page title (or hostname). */
+function htmlFilename(page: PageHtml): string {
+  let stem = page.title;
+  if (!stem) {
+    try {
+      stem = new URL(page.url).hostname;
+    } catch {
+      stem = "page";
+    }
+  }
+  const slug = stem
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 60);
+  return `${slug || "page"}.html`;
 }
 
 /**

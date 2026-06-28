@@ -17,6 +17,29 @@
           Capture Full Page
         </button>
 
+        <button id="save-btn" class="btn-primary btn-accent">
+          Save page to TokenItDown
+        </button>
+
+        <div class="target-row">
+          <label for="target-select">Convert via</label>
+          <select id="target-select"></select>
+        </div>
+
+        <div id="save-status" class="save-status hidden"></div>
+
+        <div id="save-result" class="save-result hidden">
+          <div class="save-result-msg">Saved to your library ✓</div>
+          <div class="result-actions">
+            <a id="save-download-md" class="btn-secondary" download="page.md">
+              Download Markdown
+            </a>
+            <a id="open-library" class="btn-secondary" target="_blank" rel="noopener">
+              Open Library
+            </a>
+          </div>
+        </div>
+
         <div id="status" class="status hidden">
           <div id="status-text"></div>
           <div id="progress-bar">

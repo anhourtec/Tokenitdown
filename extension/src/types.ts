@@ -130,7 +130,10 @@ export interface PageAnalysis {
 // Popup → Service Worker
 export type PopupMessage =
   | { type: "START_CAPTURE" }
-  | { type: "CANCEL_CAPTURE" };
+  | { type: "CANCEL_CAPTURE" }
+  /** Send the current page's rendered HTML to the TokenItDown platform for
+   *  conversion + library save (uses the signed-in session). */
+  | { type: "SAVE_TO_LIBRARY" };
 
 // Service Worker → Popup
 export type WorkerMessage =
@@ -146,7 +149,24 @@ export type WorkerMessage =
       /** Token estimate before/after the clean stage (M4). */
       tokens: TokenStats;
     }
-  | { type: "CAPTURE_ERROR"; error: string };
+  | { type: "CAPTURE_ERROR"; error: string }
+  | { type: "SAVE_PROGRESS" }
+  | {
+      type: "SAVE_DONE";
+      id: string;
+      title: string | null;
+      markdown: string;
+      /** Platform base URL used, so the popup can link to the library. */
+      baseUrl: string;
+    }
+  | {
+      type: "SAVE_ERROR";
+      error: string;
+      /** True on 401 — the popup prompts the user to sign in. */
+      needsLogin: boolean;
+      /** Sign-in URL on the chosen platform, when `needsLogin`. */
+      loginUrl?: string;
+    };
 
 // Service Worker → Content Script
 export type WorkerToContentMessage =
@@ -154,7 +174,16 @@ export type WorkerToContentMessage =
   | { type: "SCROLL_TO"; y: number }
   | { type: "HIDE_FIXED_ELEMENTS" }
   | { type: "RESTORE_FIXED_ELEMENTS" }
-  | { type: "EXTRACT_MARKDOWN" };
+  | { type: "EXTRACT_MARKDOWN" }
+  /** Return the page's rendered outer HTML (live, hydrated DOM). */
+  | { type: "GET_PAGE_HTML" };
+
+/** Reply to `GET_PAGE_HTML` (sent via sendResponse). */
+export interface PageHtml {
+  html: string;
+  title: string;
+  url: string;
+}
 
 // Content Script → Service Worker
 export type ContentToWorkerMessage =

@@ -60,6 +60,16 @@ function handleMessage(
         // on this message channel directly via sendResponse.
         sendResponse(analyzePage());
         break;
+
+      case "GET_PAGE_HTML":
+        // The live, hydrated outer HTML — what the platform's markitdown
+        // converter receives (so SPA/auth-gated/dynamic content is included).
+        sendResponse({
+          html: document.documentElement.outerHTML,
+          title: document.title,
+          url: location.href,
+        });
+        break;
   }
   return true; // keep message channel open for async sendResponse
 }
