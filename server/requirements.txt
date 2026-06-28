@@ -1,0 +1,9 @@
+# TokenItDown processing service.
+# markitdown[all] pulls in every optional converter (pdf, docx, pptx, xlsx, xls,
+# outlook, audio-transcription, youtube-transcription, azure-*). Runtime binaries
+# ffmpeg + exiftool are installed in the Dockerfile (audio + image EXIF).
+markitdown[all]==0.1.6
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+python-multipart==0.0.20
+requests==2.32.3

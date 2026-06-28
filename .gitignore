@@ -34,3 +34,13 @@ storybook-static/
 /playwright-report/
 /playwright/.cache/
 .playwright-mcp/
+
+# processing service (Python)
+server/vendor/
+server/.venv/
+**/__pycache__/
+server/.pytest_cache/
+*.pyc
+
+# uploaded originals (local storage volume)
+/data/
