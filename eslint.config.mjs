@@ -17,6 +17,11 @@ const eslintIgnore = [
   "*.min.js",
   "*.config.js",
   "*.d.ts",
+  // Vendored from shadcn/ui + next-shadcn-admin-dashboard — keep close to source.
+  "components/ui/**",
+  "hooks/**",
+  "app/dashboard/_components/home/**",
+  "app/dashboard/_components/sidebar/nav-main.tsx",
 ]
 
 const config = typescriptEslint.config(

@@ -1,0 +1,122 @@
+name: tokenitdown
+
+# Full stack: web (Next.js) + Postgres + Redis. Deployed on 192.168.69.16 via
+# ./deploy.sh. Ports are deliberately different from BookYourPTO-SaaS so both
+# stacks coexist on the same host:
+#   Web      -> host ${WEB_PORT:-3030}  (container 3000)   [BookYourPTO uses 3010]
+#   Postgres -> host 5433  (container 5432)   [BookYourPTO uses 5432]
+#   Redis    -> host 6386  (container 6379)   [BookYourPTO uses 6385]
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: tokenitdown-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-tokenitdown}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-tokenitdown}
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-tokenitdown} -d ${POSTGRES_DB:-tokenitdown}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - tokenitdown-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: tokenitdown-redis
+    restart: unless-stopped
+    # requirepass is mandatory: Redis 7 protected-mode drops non-loopback
+    # clients when no password is set, so any LAN client connecting to the
+    # published port would silently fail.
+    command: redis-server --appendonly yes --requirepass "${REDIS_PASSWORD:?set REDIS_PASSWORD in .env}"
+    ports:
+      - "6386:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - tokenitdown-network
+
+  # Python MarkItDown processing service. Internal only — NO published ports;
+  # only `web` reaches it over the compose network, gated by the shared token.
+  markitdown:
+    build:
+      context: ./server
+    image: tokenitdown-markitdown
+    container_name: tokenitdown-markitdown
+    restart: unless-stopped
+    environment:
+      MARKITDOWN_SERVICE_TOKEN: ${MARKITDOWN_SERVICE_TOKEN:?set MARKITDOWN_SERVICE_TOKEN in .env}
+      MAX_UPLOAD_BYTES: ${MAX_UPLOAD_BYTES:-52428800}
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/health"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - tokenitdown-network
+
+  web:
+    build:
+      context: .
+      target: runner
+    image: tokenitdown-web
+    container_name: tokenitdown-web
+    restart: unless-stopped
+    # .env supplies BETTER_AUTH_SECRET, BETTER_AUTH_URL, TRUSTED_ORIGINS, etc.
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      DB_SSL: "false"
+      # Connect to the sibling containers over the compose network (not the
+      # published host ports).
+      DATABASE_URL: postgresql://${POSTGRES_USER:-tokenitdown}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-tokenitdown}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      # Reach the processing service over the compose network; store originals on
+      # the mounted volume.
+      MARKITDOWN_SERVICE_URL: http://markitdown:8000
+      STORAGE_DIR: /data/uploads
+    ports:
+      # Host port is configurable (WEB_PORT) to avoid clashes with other apps on
+      # the server. Keep BETTER_AUTH_URL in .env in sync with this port.
+      - "${WEB_PORT:-3030}:3000"
+    volumes:
+      # Persist original uploaded files outside the container.
+      - uploads_data:/data/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      markitdown:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://localhost:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+    networks:
+      - tokenitdown-network
+
+volumes:
+  postgres_data:
+  redis_data:
+  uploads_data:
+
+networks:
+  tokenitdown-network:
+    driver: bridge
