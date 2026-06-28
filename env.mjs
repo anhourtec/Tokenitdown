@@ -22,6 +22,17 @@ export const env = createEnv({
     // origins) beyond BETTER_AUTH_URL. In dev the LAN URL is auto-added so
     // others on your network can sign in. e.g. "http://192.168.1.20:3000".
     TRUSTED_ORIGINS: z.string().optional(),
+    // Base URL of the internal Python MarkItDown processing service. Inside
+    // docker-compose this is http://markitdown:8000; locally http://localhost:8000.
+    MARKITDOWN_SERVICE_URL: z.string().url().default("http://localhost:8000"),
+    // Shared secret sent as X-Service-Token to the processing service. Must match
+    // the service's MARKITDOWN_SERVICE_TOKEN. Generate: `openssl rand -base64 24`.
+    MARKITDOWN_SERVICE_TOKEN: z.string().min(16),
+    // Directory where original uploaded files are stored (per-user subfolders).
+    // A mounted volume in Docker; a local path in dev.
+    STORAGE_DIR: z.string().default("./data/uploads"),
+    // Max upload size accepted by the convert API, in bytes (default 50 MB).
+    MAX_UPLOAD_BYTES: z.coerce.number().int().positive().default(52428800),
   },
   client: {
     // Base URL the browser auth client talks to. Defaults to the current origin
@@ -35,6 +46,10 @@ export const env = createEnv({
     BETTER_AUTH_URL: process.env.BETTER_AUTH_URL,
     REDIS_URL: process.env.REDIS_URL,
     TRUSTED_ORIGINS: process.env.TRUSTED_ORIGINS,
+    MARKITDOWN_SERVICE_URL: process.env.MARKITDOWN_SERVICE_URL,
+    MARKITDOWN_SERVICE_TOKEN: process.env.MARKITDOWN_SERVICE_TOKEN,
+    STORAGE_DIR: process.env.STORAGE_DIR,
+    MAX_UPLOAD_BYTES: process.env.MAX_UPLOAD_BYTES,
     NEXT_PUBLIC_BETTER_AUTH_URL: process.env.NEXT_PUBLIC_BETTER_AUTH_URL,
   },
   // Allow `npm run build` / drizzle-kit and CI to run without a full env.

@@ -48,6 +48,26 @@ services:
     networks:
       - tokenitdown-network
 
+  # Python MarkItDown processing service. Internal only — NO published ports;
+  # only `web` reaches it over the compose network, gated by the shared token.
+  markitdown:
+    build:
+      context: ./server
+    image: tokenitdown-markitdown
+    container_name: tokenitdown-markitdown
+    restart: unless-stopped
+    environment:
+      MARKITDOWN_SERVICE_TOKEN: ${MARKITDOWN_SERVICE_TOKEN:?set MARKITDOWN_SERVICE_TOKEN in .env}
+      MAX_UPLOAD_BYTES: ${MAX_UPLOAD_BYTES:-52428800}
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/health"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - tokenitdown-network
+
   web:
     build:
       context: .
@@ -65,14 +85,23 @@ services:
       # published host ports).
       DATABASE_URL: postgresql://${POSTGRES_USER:-tokenitdown}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-tokenitdown}
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      # Reach the processing service over the compose network; store originals on
+      # the mounted volume.
+      MARKITDOWN_SERVICE_URL: http://markitdown:8000
+      STORAGE_DIR: /data/uploads
     ports:
       # Host port is configurable (WEB_PORT) to avoid clashes with other apps on
       # the server. Keep BETTER_AUTH_URL in .env in sync with this port.
       - "${WEB_PORT:-3030}:3000"
+    volumes:
+      # Persist original uploaded files outside the container.
+      - uploads_data:/data/uploads
     depends_on:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      markitdown:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "node -e \"fetch('http://localhost:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
@@ -86,6 +115,7 @@ services:
 volumes:
   postgres_data:
   redis_data:
+  uploads_data:
 
 networks:
   tokenitdown-network:
