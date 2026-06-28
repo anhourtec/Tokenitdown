@@ -6,7 +6,7 @@ export const metadata = {
 
 export default function LibraryPage() {
   return (
-    <div className="@container/main flex flex-col gap-4 md:gap-6">
+    <div className="@container/main flex min-h-0 flex-1 flex-col gap-4 md:gap-6">
       <div className="flex flex-col gap-1">
         <h2 className="font-semibold text-2xl tracking-tight">Library</h2>
         <p className="text-muted-foreground text-sm">Your converted documents. View, download, or remove them.</p>
