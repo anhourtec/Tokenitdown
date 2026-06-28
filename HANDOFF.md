@@ -222,6 +222,53 @@ status + result viewer with Copy / Download .md) and `app/dashboard/library`
 against `http://192.168.69.16:<WEB_PORT>` after `./deploy.sh`, or locally with a DB.
 **Pending user testing / not committed at time of writing this note.**
 
+## Phase 1b — Convert UX, viewers, Documents (2026-06-28)
+
+Built out the conversion UX and document viewers (all verified in `npm run dev` via
+Playwright; **Docker deploy deferred** — see the 404 note below).
+
+**Per-format Convert pages + sidebar:**
+- `app/dashboard/convert/formats.ts` — config for every format (slug, label, accept,
+  extensions, FileCard types). Dynamic route `app/dashboard/convert/[format]` +
+  parameterized `Converter`; `/dashboard/convert` is a hub grid. Sidebar **Convert**
+  is now a collapsible parent with per-format buttons (Md PDF/Docs/PPTX/Excel/…),
+  **expanded by default** (`defaultOpen` flag honored in `nav-main`).
+- `components/ui/file-card.tsx` (vendored, extended with `mp3`/`epub`) — colored
+  file-type cards shown on the hub + fanned in the dropzones. **No filesize shown.**
+- `scan-animation.tsx` — brand-colored document-scan animation while converting.
+
+**Rich Markdown rendering:** `components/ui/markdown.tsx` (`react-markdown` +
+`remark-gfm` + Tailwind Typography `prose`, theme-aware) renders converted output
+like GitHub (tables, headings, etc.). Used in Convert results + the viewers.
+`@plugin '@tailwindcss/typography'` added to `styles/tailwind.css`.
+
+**File viewer (`components/ui/file-viewer.tsx`)** — resizable tree + Shiki raw view
++ Markdown preview, with a **Preview/Raw** toggle. Powers **Library**
+(`/dashboard/library`), which lists all converted docs and renders the selected
+one; download/delete in the header.
+
+**Documents (`/dashboard/documents`)** — surfaces every **original** uploaded file.
+New endpoint `app/api/documents/[id]/file` streams the stored original (inline only
+for PDF/raster images; HTML/SVG/others force-download; `nosniff`). Viewer shows the
+**Original** (native browser PDF viewer / image) **or Markdown** (Preview/Raw), with
+download + delete. `getDocumentFile()` added to `lib/documents.ts`.
+
+**Deps added:** `react-markdown`, `remark-gfm`, `@tailwindcss/typography`, `shiki`,
+`sonner` (+ `<Toaster>` in `app/providers.tsx`), `react-resizable-panels@^3` (v4
+renamed its API — pinned to v3), `@radix-ui/react-accordion`, `@radix-ui/react-scroll-area`.
+Vendored `components/ui/{resizable,scroll-area}.tsx`.
+
+**Deliberately NOT done:** the pasted `@embedpdf` PDF viewer — it needs `@base-ui/react`
+(a second primitives system clashing with our Radix shadcn) + a `document-viewer-sidebar`
+component that wasn't provided. The browser-native PDF viewer covers it for now.
+
+**Dev note:** conversions need the Python service on `:8000`
+(`cd server && MARKITDOWN_SERVICE_TOKEN=… ./.venv/bin/uvicorn app.main:app --port 8000`).
+**Known issue:** the Docker production build prerenders auth-gated dashboard child
+routes into cached 404s; `force-dynamic` on the dashboard layout fixes it locally
+(`next start` serves them 200) but the docker image still 404'd in testing — revisit
+before the next Docker deploy. Dev (`npm run dev`) is unaffected.
+
 ## What Worked
 - Grep-based scrubbing (`grep -rIn -i "blazity\|next-enterprise\|pnpm"`) to confirm no stray references remain — repeat this after future edits.
 - Converting `pnpm.overrides` → top-level npm `overrides` (npm uses a different key).
