@@ -4,6 +4,8 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
 
+import { LoginOverlay } from "./login-overlay"
+
 import { Button } from "../../components/ui/button"
 import { Card, CardContent } from "../../components/ui/card"
 import { Checkbox } from "../../components/ui/checkbox"
@@ -30,6 +32,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
   const [confirmPassword, setConfirmPassword] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
+  const [success, setSuccess] = useState<{ name: string; email: string } | null>(null)
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -47,18 +50,32 @@ export function AuthForm({ mode }: { mode: Mode }) {
     }
 
     setPending(true)
-    const { error: authError } = isRegister
+    const result = isRegister
       ? await signUp.email({ name, email, password })
       : await signIn.email({ email, password })
     setPending(false)
 
-    if (authError) {
-      setError(authError.message ?? "Something went wrong. Please try again.")
+    if (result.error) {
+      setError(result.error.message ?? "Something went wrong. Please try again.")
       return
     }
 
-    router.push("/dashboard")
-    router.refresh()
+    const signedInName = (result.data as { user?: { name?: string } } | null)?.user?.name
+    setSuccess({ name: isRegister ? name : (signedInName ?? ""), email })
+  }
+
+  if (success) {
+    return (
+      <LoginOverlay
+        name={success.name}
+        email={success.email}
+        mode={mode}
+        onComplete={() => {
+          router.push("/dashboard")
+          router.refresh()
+        }}
+      />
+    )
   }
 
   return (
