@@ -1,18 +1,29 @@
 "use client"
 
-import { Check, Code2, Copy, Download, Eye, FileText, FolderOpen, Loader2, Trash2 } from "lucide-react"
+import { Check, Code2, Copy, Download, Eye, FileText, FolderOpen, Loader2, Search, Trash2 } from "lucide-react"
 import Link from "next/link"
 import * as React from "react"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
+import { CleanInsightsButton } from "@/components/ui/clean-insights"
 import { FileCard, type FormatFileProps } from "@/components/ui/file-card"
 import { ShikiViewer } from "@/components/ui/file-viewer"
+import { Input } from "@/components/ui/input"
 import { Markdown } from "@/components/ui/markdown"
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
+import type { CleanStats } from "@/lib/markdown/clean"
 import { cn } from "@/lib/utils"
+
+interface DocInsights {
+  rawTokens?: number
+  cleanTokens?: number
+  cleanTier?: string
+  cleanStats?: CleanStats | null
+}
 
 interface DocSummary {
   id: string
@@ -77,10 +88,23 @@ function previewKind(doc: DocSummary): "pdf" | "image" | "other" {
   return "other"
 }
 
+type DocType = "all" | "pdf" | "image" | "office" | "data" | "other"
+
+function docType(doc: DocSummary): Exclude<DocType, "all"> {
+  const ext = extOf(doc.sourceName)
+  if (ext === "pdf") return "pdf"
+  if (["png", "jpg", "jpeg", "gif", "webp", "bmp", "tiff"].includes(ext)) return "image"
+  if (["doc", "docx", "ppt", "pptx", "xls", "xlsx"].includes(ext)) return "office"
+  if (["csv", "tsv", "json", "xml", "txt", "md"].includes(ext)) return "data"
+  return "other"
+}
+
 export function DocumentsClient() {
   const [docs, setDocs] = React.useState<DocSummary[] | null>(null)
   const [error, setError] = React.useState<string | null>(null)
   const [activeId, setActiveId] = React.useState<string | undefined>(undefined)
+  const [query, setQuery] = React.useState("")
+  const [typeFilter, setTypeFilter] = React.useState<DocType>("all")
 
   React.useEffect(() => {
     let mounted = true
@@ -102,7 +126,15 @@ export function DocumentsClient() {
     }
   }, [])
 
-  const active = React.useMemo(() => docs?.find((d) => d.id === activeId) ?? docs?.[0], [docs, activeId])
+  const visible = React.useMemo(() => {
+    if (!docs) return []
+    const q = query.trim().toLowerCase()
+    return docs.filter(
+      (d) => (typeFilter === "all" || docType(d) === typeFilter) && (!q || d.sourceName.toLowerCase().includes(q))
+    )
+  }, [docs, query, typeFilter])
+
+  const active = React.useMemo(() => visible.find((d) => d.id === activeId) ?? visible[0], [visible, activeId])
 
   const removeDoc = React.useCallback(async (id: string) => {
     const res = await fetch(`/api/documents/${id}`, { method: "DELETE" })
@@ -138,27 +170,58 @@ export function DocumentsClient() {
     <ResizablePanelGroup direction="horizontal" className="min-h-0 flex-1 rounded-lg border">
       <ResizablePanel defaultSize={26} minSize={18} maxSize={42}>
         <div className="flex h-full flex-col border-r">
-          <div className="flex items-center gap-2 border-b p-3">
-            <FolderOpen className="size-4" />
-            <span className="text-sm font-medium">Originals ({docs.length})</span>
+          <div className="flex flex-col gap-2 border-b p-3">
+            <div className="flex items-center gap-2">
+              <FolderOpen className="size-4" />
+              <span className="text-sm font-medium">Originals</span>
+              <span className="ml-auto text-muted-foreground text-xs tabular-nums">
+                {visible.length}/{docs.length}
+              </span>
+            </div>
+            <div className="relative">
+              <Search className="-translate-y-1/2 absolute top-1/2 left-2.5 size-4 text-muted-foreground" />
+              <Input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search files…"
+                className="h-8 pl-8"
+              />
+            </div>
+            <Select value={typeFilter} onValueChange={(v) => setTypeFilter(v as DocType)}>
+              <SelectTrigger size="sm" className="h-8 w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All types</SelectItem>
+                <SelectItem value="pdf">PDF</SelectItem>
+                <SelectItem value="image">Images</SelectItem>
+                <SelectItem value="office">Office (Word/Excel/PPT)</SelectItem>
+                <SelectItem value="data">Data (CSV/JSON/XML)</SelectItem>
+                <SelectItem value="other">Other</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
           <ScrollArea className="min-h-0 flex-1">
             <div className="flex flex-col gap-0.5 p-2">
-              {docs.map((doc) => (
-                <button
-                  key={doc.id}
-                  onClick={() => setActiveId(doc.id)}
-                  className={cn(
-                    "flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors",
-                    active?.id === doc.id ? "bg-muted" : "hover:bg-accent hover:text-accent-foreground"
-                  )}
-                  title={doc.sourceName}
-                >
-                  <FileText className="size-4 shrink-0 text-muted-foreground" />
-                  <span className="min-w-0 flex-1 truncate">{doc.sourceName}</span>
-                  <span className="shrink-0 text-xs text-muted-foreground">{formatBytes(doc.sizeBytes)}</span>
-                </button>
-              ))}
+              {visible.length === 0 ? (
+                <p className="px-2 py-6 text-center text-muted-foreground text-sm">No files match.</p>
+              ) : (
+                visible.map((doc) => (
+                  <button
+                    key={doc.id}
+                    onClick={() => setActiveId(doc.id)}
+                    className={cn(
+                      "flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors",
+                      active?.id === doc.id ? "bg-muted" : "hover:bg-accent hover:text-accent-foreground"
+                    )}
+                    title={doc.sourceName}
+                  >
+                    <FileText className="size-4 shrink-0 text-muted-foreground" />
+                    <span className="min-w-0 flex-1 truncate">{doc.sourceName}</span>
+                    <span className="shrink-0 text-muted-foreground text-xs">{formatBytes(doc.sizeBytes)}</span>
+                  </button>
+                ))
+              )}
             </div>
           </ScrollArea>
         </div>
@@ -180,6 +243,7 @@ function Preview({ doc, onDelete }: { doc: DocSummary; onDelete: (id: string) =>
   const [tab, setTab] = React.useState<Tab>("original")
   const [mdView, setMdView] = React.useState<"preview" | "raw">("preview")
   const [markdown, setMarkdown] = React.useState<string | null>(null)
+  const [insights, setInsights] = React.useState<DocInsights | null>(null)
   const [mdError, setMdError] = React.useState<string | null>(null)
   const [copied, setCopied] = React.useState(false)
   const [confirmDelete, setConfirmDelete] = React.useState(false)
@@ -191,9 +255,17 @@ function Preview({ doc, onDelete }: { doc: DocSummary; onDelete: (id: string) =>
     ;(async () => {
       try {
         const res = await fetch(`/api/documents/${doc.id}`)
-        const body = (await res.json()) as { markdown?: string; error?: string }
+        const body = (await res.json()) as { markdown?: string; error?: string } & DocInsights
         if (!res.ok) throw new Error(body?.error ?? "Failed to load markdown")
-        if (mounted) setMarkdown(body.markdown ?? "")
+        if (mounted) {
+          setMarkdown(body.markdown ?? "")
+          setInsights({
+            rawTokens: body.rawTokens,
+            cleanTokens: body.cleanTokens,
+            cleanTier: body.cleanTier,
+            cleanStats: body.cleanStats ?? null,
+          })
+        }
       } catch (err) {
         if (mounted) setMdError((err as Error).message)
       }
@@ -253,6 +325,14 @@ function Preview({ doc, onDelete }: { doc: DocSummary; onDelete: (id: string) =>
 
           {tab === "markdown" && (
             <>
+              {insights && (
+                <CleanInsightsButton
+                  rawTokens={insights.rawTokens}
+                  cleanTokens={insights.cleanTokens}
+                  cleanTier={insights.cleanTier}
+                  stats={insights.cleanStats}
+                />
+              )}
               <div className="flex items-center rounded-md border p-0.5">
                 <button
                   type="button"
