@@ -1,4 +1,4 @@
-import { boolean, index, integer, pgTable, text, timestamp } from "drizzle-orm/pg-core"
+import { boolean, index, integer, jsonb, pgTable, text, timestamp } from "drizzle-orm/pg-core"
 
 /**
  * better-auth core schema (email/password + sessions).
@@ -79,7 +79,19 @@ export const document = pgTable(
     sizeBytes: integer("sizeBytes").notNull().default(0),
     // Relative path of the stored original under STORAGE_DIR; null for URL sources.
     storagePath: text("storagePath"),
+    // Cleaned, LLM-ready Markdown (what we serve by default).
     markdown: text("markdown").notNull(),
+    // Raw engine output before the cleaning pass — kept so we can re-process
+    // without re-converting. Null for older rows created before cleaning existed.
+    markdownRaw: text("markdownRaw"),
+    // Which cleaning tier produced `markdown`: "raw" | "clean" | "compact".
+    cleanTier: text("cleanTier").notNull().default("clean"),
+    // Estimated token counts before/after cleaning (the "tokens saved" metric).
+    rawTokens: integer("rawTokens").notNull().default(0),
+    cleanTokens: integer("cleanTokens").notNull().default(0),
+    // Per-transform counts from the cleaning pass (what was eliminated), for
+    // transparency in the UI. Shape mirrors CleanStats in lib/markdown/clean.ts.
+    cleanStats: jsonb("cleanStats"),
     createdAt: timestamp("createdAt").notNull().defaultNow(),
   },
   (table) => [index("document_userId_idx").on(table.userId)]
