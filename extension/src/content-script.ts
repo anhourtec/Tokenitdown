@@ -1,5 +1,6 @@
-import type { WorkerToContentMessage } from "./types";
+import type { PageAnalysis, WorkerToContentMessage } from "./types";
 import { extractMarkdown } from "./lib/extract";
+import { collectSignals, decideRoute } from "./lib/route";
 
 // Tracks elements we hid so we can restore them
 let hiddenElements: Array<{ el: HTMLElement; prevVisibility: string }> = [];
@@ -37,12 +38,24 @@ chrome.runtime.onMessage.addListener(
       case "EXTRACT_MARKDOWN":
         // Readability runs synchronously against the live DOM, so we can reply
         // on this message channel directly via sendResponse.
-        sendResponse(extractMarkdown(document, location.href));
+        sendResponse(analyzePage());
         break;
     }
     return true; // keep message channel open for async sendResponse
   }
 );
+
+/**
+ * Extracts the page's Markdown, scores it against DOM signals, and routes it to
+ * the DOM / vision / hybrid pipeline (M2). Returned to the service worker as the
+ * `EXTRACT_MARKDOWN` response.
+ */
+function analyzePage(): PageAnalysis {
+  const extract = extractMarkdown(document, location.href);
+  const signals = collectSignals(document, extract);
+  const route = decideRoute(signals);
+  return { extract, signals, route };
+}
 
 function getPageMetrics() {
   return {

@@ -1,4 +1,4 @@
-import type { PopupMessage, WorkerMessage } from "../types";
+import type { PopupMessage, RouteDecision, WorkerMessage } from "../types";
 
 const captureBtn = document.getElementById("capture-btn") as HTMLButtonElement;
 const statusEl = document.getElementById("status") as HTMLDivElement;
@@ -8,6 +8,7 @@ const resultEl = document.getElementById("result") as HTMLDivElement;
 const previewImg = document.getElementById("preview") as HTMLImageElement;
 const downloadLink = document.getElementById("download-link") as HTMLAnchorElement;
 const downloadMd = document.getElementById("download-md") as HTMLAnchorElement;
+const routeBadge = document.getElementById("route-badge") as HTMLDivElement;
 const errorEl = document.getElementById("error") as HTMLDivElement;
 
 // Tracks the object URL backing the Markdown download so we can revoke it when
@@ -25,7 +26,7 @@ port.onMessage.addListener((msg: WorkerMessage) => {
       break;
 
     case "CAPTURE_DONE":
-      showResult(msg.dataUrl, msg.markdown, msg.title);
+      showResult(msg.dataUrl, msg.markdown, msg.title, msg.route);
       break;
 
     case "CAPTURE_ERROR":
@@ -49,12 +50,19 @@ function startCapture() {
   send({ type: "START_CAPTURE" });
 }
 
-function showResult(dataUrl: string, markdown: string, title: string) {
+function showResult(
+  dataUrl: string,
+  markdown: string,
+  title: string,
+  route: RouteDecision
+) {
   statusEl.classList.add("hidden");
   captureBtn.disabled = false;
 
   previewImg.src = dataUrl;
   downloadLink.href = dataUrl;
+
+  showRoute(route);
 
   // Back the Markdown download with a Blob object URL rather than a giant
   // data: URL — more memory-efficient for long pages. Revoke the previous one.
@@ -66,6 +74,22 @@ function showResult(dataUrl: string, markdown: string, title: string) {
   downloadMd.download = `${slugify(title) || "page"}.md`;
 
   resultEl.classList.remove("hidden");
+}
+
+/** Labels for each route path, shown as a badge so the user sees which pipeline
+ *  produced the Markdown. */
+const ROUTE_LABELS: Record<RouteDecision["path"], string> = {
+  dom: "DOM",
+  vision: "Vision",
+  hybrid: "Hybrid",
+};
+
+/** Renders the router's decision as a colored badge with a tooltip explaining why. */
+function showRoute(route: RouteDecision) {
+  routeBadge.textContent = `${ROUTE_LABELS[route.path]} path`;
+  routeBadge.title = route.reason;
+  routeBadge.dataset.path = route.path;
+  routeBadge.classList.remove("hidden");
 }
 
 /** Turns a page title into a safe, lowercase filename stem. */

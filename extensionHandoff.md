@@ -1,6 +1,6 @@
 # Extension Testing Handoff
 
-**Last updated:** 2026-06-26 (updated after Step 1 attempt)
+**Last updated:** 2026-06-27 (after M2 — page router: DOM / vision / hybrid)
 **Branch:** `extension`
 **Scope:** Testing the Chrome extension (`extension/`) — what was done, what works, what's still unverified, and exactly where to continue.
 
@@ -8,7 +8,7 @@
 
 ## What Exists in the Extension
 
-The Chrome MV3 extension lives entirely under `extension/`. It captures a full-page screenshot by scrolling the active tab, stitching viewport-sized frames into a single PNG.
+The Chrome MV3 extension lives entirely under `extension/`. It captures a full-page screenshot by scrolling the active tab and stitching viewport-sized frames into a single PNG, and (as of M1) **extracts the page's main content as clean Markdown** from the live DOM. The popup offers both as downloads.
 
 ### Entry points (all built by Vite)
 
@@ -16,15 +16,21 @@ The Chrome MV3 extension lives entirely under `extension/`. It captures a full-p
 |------|---------|
 | `src/popup/popup.ts` + `popup.html` + `popup.css` | Extension popup UI: capture button, progress bar, preview image, download link, error display |
 | `src/service-worker.ts` | Background worker — receives `START_CAPTURE` from the popup, orchestrates scroll → capture → stitch |
-| `src/content-script.ts` | Injected into every page — responds to scroll/metrics/hide-fixed messages from the service worker |
+| `src/content-script.ts` | Injected into every page — responds to scroll/metrics/hide-fixed messages **and `EXTRACT_MARKDOWN`** from the service worker |
 | `src/lib/screenshot.ts` | Pure logic: `captureFrames()` — scrolls top-to-bottom in viewport steps, calls injected callbacks |
 | `src/lib/stitch.ts` | Pure logic: `stitch()` — composites frames onto an `OffscreenCanvas`, returns a PNG data URL |
-| `src/types.ts` | Shared message type definitions (pure TypeScript interfaces, no Chrome API usage) |
+| `src/lib/extract.ts` | Pure logic: `extractMarkdown(doc, url)` — Readability main-content extraction → Turndown (GFM) → clean Markdown. Returns `ExtractResult` |
+| `src/lib/route.ts` | M2 router: `collectSignals(doc, extract)` reads DOM signals (text length, readability, canvas/svg/img counts + area ratios, link density); pure `decideRoute(signals)` → `RouteDecision` (`dom` / `vision` / `hybrid`) |
+| `src/types.ts` | Shared message type definitions (pure TypeScript interfaces, no Chrome API usage) — incl. `PageSignals`, `RouteDecision`, `PageAnalysis` |
+| `src/types/turndown-plugin-gfm.d.ts` | Minimal type decl for `turndown-plugin-gfm` (ships no types) |
 
-### Build
+### Build & test
 ```bash
-cd extension && npm run build     # rebuilds dist/
+cd extension && npm run build     # rebuilds dist/ (copies public/ → dist/, incl. icons)
 cd extension && npm run typecheck # zero TS errors
+# unit tests run from the repo root via Vitest:
+npx vitest run extension/src/lib   # screenshot (7) + extract (6) + route (12) = 25 tests
+npm run e2e:extension              # 3 Playwright e2e tests (loads the unpacked extension)
 ```
 
 ---
@@ -36,8 +42,12 @@ cd extension && npm run typecheck # zero TS errors
 | `extension/manifest.json` — service worker format fix | ✅ Fixed (`"type": "module"` removed) |
 | `extension/public/src/icons/` — placeholder PNG icons | ✅ Moved to `public/`; build copies them to `dist/` every time |
 | `extension/src/lib/screenshot.test.ts` — 7 unit tests | ✅ All pass |
-| `e2e/extension.spec.ts` — 3 Playwright e2e tests | ✅ All pass (1.7s) |
+| `extension/src/lib/extract.test.ts` — 6 unit tests (DOM→MD) | ✅ All pass |
+| `extension/src/lib/route.test.ts` — 12 unit tests (M2 router) | ✅ All pass |
+| `e2e/extension.spec.ts` — 3 Playwright e2e tests | ✅ All pass (2.1s) |
 | `playwright.extension.config.ts` + npm script | ✅ In place |
+| M1 DOM→Markdown — live-verified in real Chrome + security review | ✅ Clean |
+| M2 router — live-verified in real Chrome (3/3 routes) + security review | ✅ Clean |
 
 ### Resolution of the "Chrome launch crash" (session 2026-06-27)
 
@@ -344,3 +354,127 @@ fallback is solid for `chrome://` / debugger-declined cases. One focused commit 
 **Sources:** [Full-Page-Screenshot (CDP)](https://github.com/sssstf0rest/Full-Page-Screenshot) ·
 [captureBeyondViewport — screenshotone](https://screenshotone.com/blog/capture-beyond-viewport-in-puppeteer-and-chrome-devtools-protocol/) ·
 [GoFullPage](https://chromewebstore.google.com/detail/gofullpage-full-page-scre/fdpohaocaechififmbbbbbknoalclacl)
+
+---
+
+## Web → Markdown Pipeline — Architecture & Progress
+
+The capture work feeds a larger goal: **turn any web page into clean, LLM-ready
+Markdown** (plus the screenshot as a required artifact). Agreed architecture:
+
+```
+CAPTURE  (always)  full-page screenshot + DOM snapshot (live, post-render)
+   │
+ROUTE   per page (later per-region): text density · readability · canvas/SVG/img dominance
+   ├── DOM path     Readability → Turndown            (text-heavy pages)
+   ├── Hybrid       DOM skeleton + vision on charts    (text + visual blocks)
+   └── Vision path  tile screenshot → vision → MD       (canvas/dashboards)
+   │
+CLEAN    boilerplate strip · dedupe · token compress
+   │
+OUTPUT   page.md  +  screenshot.png  +  a11y-tree.yml   (the bundle)
+```
+
+**Key decisions (from the design discussion):**
+- **Mixed / auto-route** — build a router that picks DOM vs vision per page.
+- **Screenshot is a required output**, not just a means — it doubles as the
+  source for per-region vision crops in the hybrid path.
+- **DOM is the markdown source of truth where it has text.** We read the *live,
+  rendered* DOM in the content script, so **SSR is irrelevant** — CSR/SPA pages are
+  already hydrated when we read them. The vision path is the universal floor for
+  canvas / closed-shadow-DOM / image-text / obfuscated pages (anything a human can
+  see, we can capture as pixels).
+- Extension superpowers to exploit later: `all_frames: true` lets us read
+  cross-origin iframes; the existing scroll pass can accumulate DOM to capture
+  virtualized/infinite-scroll lists.
+
+### Milestone M1 — DOM → Markdown ✅ DONE (2026-06-27)
+
+First slice of the DOM path. Produces clean Markdown alongside the screenshot.
+
+**What was built:**
+- `src/lib/extract.ts` — `extractMarkdown(doc, url)`: clones the document (Readability
+  mutates its input), runs `@mozilla/readability` to isolate the main article
+  (strips nav/footer/ads), converts to Markdown with `turndown` + `turndown-plugin-gfm`
+  (ATX headings, fenced code, GFM tables/strikethrough/task-lists), and normalizes
+  blank lines. Falls back to whole-`<body>` conversion when Readability finds no
+  article; records `source: "readability" | "fallback"` and `readerable` so the M2
+  router can decide DOM-vs-vision.
+- `content-script.ts` — new `EXTRACT_MARKDOWN` message → `sendResponse(extractMarkdown(...))`
+  (Readability is synchronous, so it replies on the same channel).
+- `service-worker.ts` — `requestMarkdown(tabId)` extracts before scrolling/hiding
+  elements; `CAPTURE_DONE` now carries `markdown` + `title`.
+- `popup.{html,ts,css}` — result panel now offers **Download PNG** + **Download
+  Markdown** side-by-side. The `.md` is backed by a `Blob` object URL (revoked on
+  replacement); filename is `slugify(title).md`.
+- `types.ts` — `ExtractResult` interface; `EXTRACT_MARKDOWN` message; `CAPTURE_DONE`
+  extended with `markdown`/`title`.
+- Deps added to `extension/package.json`: `@mozilla/readability`, `turndown`,
+  `turndown-plugin-gfm`, `@types/turndown`.
+
+**Verification:**
+- `npx vitest run extension/src/lib/extract.test.ts` — 6 unit tests pass (headings,
+  emphasis, links, GFM tables, nav/footer stripping, canvas-only fallback).
+- **Live-verified in real Chrome**: loaded the unpacked extension, served a test
+  article page, and called `EXTRACT_MARKDOWN` through the service worker
+  (`context.serviceWorkers()[0].evaluate(...)` → `chrome.tabs.sendMessage`). Bundled
+  Readability + Turndown run correctly in the content script; all 8 content checks
+  passed (clean Markdown, nav/footer stripped, tables/links preserved). This path
+  needs **no `activeTab` gesture** (content scripts auto-inject on `<all_urls>`), so
+  unlike the screenshot flow it *is* e2e-testable.
+- Existing `e2e/extension.spec.ts` still 3/3; popup two-button layout verified live
+  via Playwright (forced result panel).
+- `/security-review` — **clean, no findings**. Markdown is only ever *downloaded*
+  (a `text/markdown` Blob), never rendered as HTML, so no DOM-XSS sink. ⚠️ If a
+  future milestone adds an in-popup Markdown **preview**, it must sanitize
+  (DOMPurify) or render with HTML disabled — the content is untrusted page HTML.
+
+### Milestone M2 — Page Router ✅ DONE (2026-06-27)
+
+Decides, per page, which pipeline should produce the Markdown: **DOM**, **vision**,
+or **hybrid**. This is the routing layer the rest of the web→Markdown pipeline
+branches on.
+
+**What was built:**
+- `src/lib/route.ts`:
+  - `collectSignals(doc, extract): PageSignals` — reads the live DOM for `textLength`
+    + `readerable` + `source` (carried from the extract), `canvas/svg/img` counts,
+    their **area ratios** (sum of `getBoundingClientRect` area / total page layout
+    area, clamped 0–1), combined `visualAreaRatio`, and `linkDensity` (anchor text /
+    body text).
+  - `decideRoute(signals): RouteDecision` — **pure** (no DOM), so fully unit-testable.
+    Ordered rules: (1) text < `DOM_MIN_TEXT` (200) → **vision**; (2) `visualAreaRatio`
+    ≥ `VISION_VISUAL_RATIO` (0.6) → **vision**; (3) `visualAreaRatio` ≥
+    `HYBRID_VISUAL_RATIO` (0.3) **or** `canvasAreaRatio` ≥ `HYBRID_CANVAS_RATIO`
+    (0.1) → **hybrid**; (4) readable + `readability` source → **dom**; (5) else body
+    fallback → **dom** (low confidence). Returns `{ path, confidence, reason }`.
+- `types.ts` — `RoutePath`, `PageSignals`, `RouteDecision`, `PageAnalysis`; `CAPTURE_DONE`
+  extended with `route`.
+- `content-script.ts` — `analyzePage()` = `extractMarkdown` + `collectSignals` +
+  `decideRoute`; `EXTRACT_MARKDOWN` now returns the full `PageAnalysis`.
+- `service-worker.ts` — `requestMarkdown` returns `PageAnalysis`; forwards `route`
+  to the popup in `CAPTURE_DONE`.
+- `popup.{ts,html,css}` — a colored **route badge** (DOM=blue / Hybrid=purple /
+  Vision=amber) with the decision `reason` as its tooltip. Rendered via `textContent`
+  + `title` + `dataset` (no HTML sink).
+
+**Verification:**
+- `npx vitest run extension/src/lib` — **25/25 pass** (route.test.ts adds 12: every
+  `decideRoute` branch + the `DOM_MIN_TEXT` boundary + `collectSignals` counts/link
+  density + ratio clamping).
+- **Live-verified in real Chrome** (area signals can't be measured in jsdom):
+  served 3 HTTP pages and called `EXTRACT_MARKDOWN` through the service worker —
+  text article → **DOM** (visualAreaRatio 0.000), full-viewport canvas → **VISION**
+  (canvasAreaRatio 1.000), article + chart canvas → **HYBRID** (canvasAreaRatio 0.157).
+  All 3 routed correctly. `getBoundingClientRect` area math works under real layout.
+- Existing `e2e/extension.spec.ts` still 3/3; `npm run build` + `typecheck` clean.
+- `/security-review` — **clean, no findings.** `route.reason` is built only from
+  numeric signals (no page text), and the popup badge uses non-HTML sinks.
+
+**Not yet done / next milestones:**
+- **M3 — Hybrid vision-assist.** Crop chart/canvas/figure regions from the existing
+  full-page screenshot (we already track scroll offsets) → vision descriptions
+  spliced into the DOM Markdown. Token-cheap: vision only for visual regions.
+- **M4 — Clean stage.** Boilerplate strip + token compressor (the PLAN.md hero).
+- **M5 — Screenshot quality (Strategy A CDP).** Matters more now: crops feed M3.
+- Wire `page.md` + `screenshot.png` into the authenticated bundle upload (PLAN.md).

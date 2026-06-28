@@ -133,6 +133,32 @@ main {
   border: 1px solid #e5e7eb;
 }
 
+.route-badge {
+  align-self: flex-start;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  cursor: help;
+  /* Default (dom) — blue. Overridden per path below. */
+  color: #1d4ed8;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+}
+
+.route-badge[data-path="hybrid"] {
+  color: #6d28d9;
+  background: #f5f3ff;
+  border-color: #ddd6fe;
+}
+
+.route-badge[data-path="vision"] {
+  color: #b45309;
+  background: #fffbeb;
+  border-color: #fde68a;
+}
+
 .error {
   font-size: 13px;
   color: #ef4444;
