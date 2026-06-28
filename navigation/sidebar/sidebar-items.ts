@@ -5,7 +5,6 @@ import {
   Gauge,
   LayoutDashboard,
   type LucideIcon,
-  Minimize2,
   Plug,
   Settings,
   Upload,
@@ -86,9 +85,8 @@ export const sidebarItems: NavGroup[] = [
     id: 2,
     label: "AI",
     items: [
-      { id: "rag", title: "RAG Export", url: "#", icon: Boxes, badge: "new" },
-      { id: "compressor", title: "Token Compressor", url: "#", icon: Minimize2, badge: "new" },
-      { id: "analytics", title: "Analytics", url: "#", icon: Gauge },
+      { id: "rag", title: "RAG Export", url: "/dashboard/rag", icon: Boxes, badge: "new" },
+      { id: "analytics", title: "Analytics", url: "/dashboard/analytics", icon: Gauge },
     ],
   },
   {
