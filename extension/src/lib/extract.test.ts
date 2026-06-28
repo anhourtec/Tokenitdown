@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { extractMarkdown } from "./extract";
+import { extractMarkdown, preferFullBody, COVERAGE_MIN } from "./extract";
 
 /** Builds a Document from an HTML string, the way the content script sees it. */
 function docFromHtml(html: string): Document {
@@ -90,5 +90,44 @@ describe("extractMarkdown", () => {
   it("normalizes excessive blank lines", () => {
     const { markdown } = extractMarkdown(docFromHtml(ARTICLE_HTML), "https://example.com/post");
     expect(markdown).not.toMatch(/\n{3,}/);
+  });
+
+  it("captures every section of a card-grid marketing page (no content dropped)", () => {
+    // The user-facing guarantee: a component-heavy page must keep all its sections,
+    // whether they come through Readability or the full-body fallback.
+    const sections = Array.from(
+      { length: 12 },
+      (_, i) =>
+        `<section><h3>Solution ${i + 1}</h3><p>Distinct selling point number ${i + 1} that the page is built to communicate.</p></section>`
+    ).join("");
+    const html = `<!DOCTYPE html><html><head><title>Marketing</title></head><body>
+      <main><h1>Hero</h1><p>Short hero line.</p></main>
+      <div class="cards">${sections}</div>
+      </body></html>`;
+    const { markdown } = extractMarkdown(docFromHtml(html), "https://example.com");
+
+    expect(markdown).toContain("Solution 1");
+    expect(markdown).toContain("Solution 12");
+  });
+});
+
+describe("preferFullBody", () => {
+  it("prefers full body when the article covers less than the minimum", () => {
+    // iotkinect.com case: Readability got ~3904 of ~7782 visible chars (≈0.50).
+    expect(preferFullBody(3904, 7782)).toBe(true);
+  });
+
+  it("keeps Readability when the article covers most of the page", () => {
+    expect(preferFullBody(7000, 7782)).toBe(false);
+  });
+
+  it("treats the coverage boundary correctly", () => {
+    const page = 1000;
+    expect(preferFullBody(COVERAGE_MIN * page - 1, page)).toBe(true);
+    expect(preferFullBody(COVERAGE_MIN * page, page)).toBe(false);
+  });
+
+  it("never prefers full body when the page has no measurable text", () => {
+    expect(preferFullBody(0, 0)).toBe(false);
   });
 });

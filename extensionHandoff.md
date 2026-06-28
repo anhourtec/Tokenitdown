@@ -31,7 +31,7 @@ clean, LLM-ready Markdown **plus** a full-page screenshot. Pipeline: capture →
 cd extension && npm run build      # rebuilds dist/ (copies public/ → dist/, incl. icons)
 cd extension && npm run typecheck  # zero TS errors
 # from repo root:
-npx vitest run extension/src/lib   # 63 unit tests (screenshot7 extract6 route12 regions9 crop6 describe5 clean6 tokens7 captureCDP5)
+npx vitest run extension/src/lib   # 68 unit tests (screenshot7 extract11 route12 regions9 crop6 describe5 clean6 tokens7 captureCDP5)
 npm run e2e:extension              # 3 Playwright e2e (loads the unpacked extension)
 ```
 
@@ -78,8 +78,12 @@ virtualized lists.
 ## Milestones (all ✅ DONE 2026-06-27)
 
 **M1 — DOM→Markdown.** `extract.ts`: clone doc (Readability mutates), isolate the article,
-convert to GFM Markdown, normalize blanks; `<body>` fallback records `source`/`readerable`
-for routing. Popup gains Download Markdown (revocable Blob URL, `slugify(title).md`). Deps:
+convert to GFM Markdown, normalize blanks. **Coverage fallback** (`preferFullBody`): if
+Readability's article covers < `COVERAGE_MIN` (0.6) of the page's visible text, convert the
+whole `<body>` instead — Readability drops card grids / dashboards / footers on
+marketing/app pages, so this recovers them (iotkinect: 5.9k → 15k chars; the M4 clean stage
+then trims the chrome). `source` = `readability` (clean article) vs `fallback` (full body).
+Popup gains Download Markdown (revocable Blob URL, `slugify(title).md`). Deps:
 `@mozilla/readability`, `turndown`, `turndown-plugin-gfm`.
 
 **M2 — Router.** `collectSignals` reads text length + readability + canvas/svg/img counts and
@@ -142,6 +146,11 @@ Refs: [CDP captureBeyondViewport](https://screenshotone.com/blog/capture-beyond-
   is unaffected (router picks DOM). *Future idea:* detect such pages (very tall `scrollHeight`
   + thin text) and prefer scroll-stitch, or warn. Lesson: **verify screenshot content, not
   just dimensions** — M5's dimension-only check missed this.
+- **Animated counters / lazy sections read stale** — extraction runs *before* the page is
+  scrolled, so count-up stats render as their initial value (iotkinect "200+/600+" → "0+")
+  and reveal-on-scroll / carousel content can be missing. **Fix (pending):** a hydration
+  scroll (top→bottom→top, with settle) before `EXTRACT_MARKDOWN`. Verified the values are
+  correct once the page has been scrolled.
 - **Full button→download flow isn't auto-tested.** `executeScript` and `captureVisibleTab`
   need the `activeTab` gesture granted by a real toolbar click, which Playwright can't do.
   `EXTRACT_MARKDOWN` (auto-injected content script) and the CDP capture (`chrome.debugger`)

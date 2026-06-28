@@ -3,6 +3,12 @@ import TurndownService from "turndown";
 import { gfm } from "turndown-plugin-gfm";
 import type { ExtractResult } from "../types";
 
+/** Below this fraction of the page's visible text, Readability is dropping too
+ *  much (common on marketing/landing/app pages built from card grids and widgets
+ *  that Readability scores as boilerplate) — convert the whole body instead so we
+ *  don't lose the bulk of the page. The M4 clean stage then strips the chrome. */
+export const COVERAGE_MIN = 0.6;
+
 /**
  * Builds a Turndown service configured for clean, LLM-ready Markdown:
  * ATX headings (`#`), fenced code blocks, and GFM tables/strikethrough/task lists.
@@ -26,18 +32,44 @@ function createTurndown(): TurndownService {
 }
 
 /**
- * Extracts the main content of a page and converts it to Markdown.
+ * Decides whether to abandon Readability's article and convert the whole body.
+ * True when the article covers less than `coverageMin` of the page's text — i.e.
+ * Readability isolated a small slice and threw the rest away. Pure/unit-testable.
+ */
+export function preferFullBody(
+  articleTextLength: number,
+  pageTextLength: number,
+  coverageMin = COVERAGE_MIN
+): boolean {
+  if (pageTextLength <= 0) return false;
+  return articleTextLength < coverageMin * pageTextLength;
+}
+
+/** Length of the page's visible text. Uses `innerText` (layout-aware, excludes
+ *  hidden/script text) in a real browser; falls back to `textContent` in a
+ *  headless DOM where `innerText` isn't implemented. */
+function pageTextLength(doc: Document): number {
+  const body = doc.body;
+  if (!body) return 0;
+  return collapsedLength((body.innerText ?? "") || body.textContent || "");
+}
+
+function collapsedLength(s: string): number {
+  return s.replace(/\s+/g, " ").trim().length;
+}
+
+/**
+ * Extracts a page's content as Markdown.
  *
- * Strategy:
- *  1. Clone the document — Readability mutates the DOM it parses, so we never
- *     touch the live page.
- *  2. Run Readability to isolate the article body (strips nav/footer/ads/chrome).
- *  3. Convert the extracted HTML to Markdown with Turndown + GFM.
+ *  1. Clone the document — Readability mutates what it parses.
+ *  2. Run Readability to isolate the article (strips nav/footer/ads/chrome).
+ *  3. Use that **only if it covers enough of the page** (`COVERAGE_MIN`). On
+ *     marketing/app pages Readability drops most of the content, so we instead
+ *     convert the whole `<body>` (chrome and all — the M4 clean stage trims it).
+ *  4. Convert the chosen HTML to Markdown with Turndown + GFM.
  *
- * Falls back to converting `<body>` directly when Readability finds no article
- * (common on apps, landing pages, dashboards). The `source` field records which
- * path produced the output so the router can later decide whether the DOM result
- * is good enough or the page should go to the vision path.
+ * `source` records which path won (`readability` = clean article, `fallback` =
+ * whole body) so the router/telemetry can reason about quality.
  */
 export function extractMarkdown(doc: Document, pageUrl: string): ExtractResult {
   const td = createTurndown();
@@ -46,14 +78,19 @@ export function extractMarkdown(doc: Document, pageUrl: string): ExtractResult {
   // Readability mutates its input — always give it a clone.
   const article = new Readability(doc.cloneNode(true) as Document).parse();
   const articleText = article?.textContent?.trim() ?? "";
+  const hasArticle = !!(article && article.content && articleText.length > 0);
 
-  if (article && article.content && articleText.length > 0) {
-    const markdown = normalize(td.turndown(article.content));
+  const useReadability =
+    hasArticle &&
+    !preferFullBody(collapsedLength(articleText), pageTextLength(doc));
+
+  if (useReadability) {
+    const markdown = normalize(td.turndown(article!.content!));
     return {
       markdown,
-      title: (article.title || doc.title || "").trim(),
-      byline: article.byline ?? null,
-      excerpt: article.excerpt ?? null,
+      title: (article!.title || doc.title || "").trim(),
+      byline: article!.byline ?? null,
+      excerpt: article!.excerpt ?? null,
       textLength: articleText.length,
       url: pageUrl,
       source: "readability",
@@ -61,15 +98,15 @@ export function extractMarkdown(doc: Document, pageUrl: string): ExtractResult {
     };
   }
 
-  // Fallback: no article detected — convert the body as-is. Lower quality, but
-  // still useful, and the thin/empty result is the signal the router needs.
+  // Full-body conversion — Readability found no article, or isolated too little
+  // of the page. Lower-level but complete; the M4 clean stage strips the chrome.
   const bodyHtml = doc.body?.innerHTML ?? "";
   const markdown = normalize(td.turndown(bodyHtml));
   return {
     markdown,
-    title: (doc.title || "").trim(),
-    byline: null,
-    excerpt: null,
+    title: (article?.title || doc.title || "").trim(),
+    byline: article?.byline ?? null,
+    excerpt: article?.excerpt ?? null,
     textLength: markdown.trim().length,
     url: pageUrl,
     source: "fallback",
