@@ -15,60 +15,86 @@ Two deployment targets from one codebase:
 - **Cloud** — multi-tenant SaaS with managed processing, billing, and a hosted MCP endpoint.
 - **Self-hosted** — a single `docker compose up`, all processing local, optional local-LLM mode, no data egress.
 
+## Features
+
+- **Convert anything to Markdown** — powered by [Microsoft MarkItDown](https://github.com/microsoft/markitdown): PDF, Word, PowerPoint, Excel, images (OCR + EXIF), audio (transcription), HTML, CSV/JSON/XML, ZIP (iterated), EPUB, and YouTube / web-page URLs.
+- **Per-format convert pages** — a dedicated page per source type (Md PDF, Md Docs, Md PPTX, Md Excel, Md Image, Md Audio, Md HTML, Md Data, Md ZIP, Md EPUB, Md URL), each with drag-and-drop batch upload, a document-scan animation while converting, and a GitHub-style rendered result.
+- **Library** — every converted document in a resizable file viewer with a **Preview / Raw** toggle (rendered Markdown via `react-markdown` + GFM, or syntax-highlighted source via Shiki), plus copy, download, and delete.
+- **Documents** — every **original** uploaded file, previewed in place: PDFs in the browser's native viewer, images inline, others downloadable — with an **Original / Markdown** toggle and delete. Originals are stored on a local volume; the converted Markdown lives in Postgres.
+- **Auth** — email/password with httpOnly cookie sessions ([better-auth](https://www.better-auth.com/)) stored in Postgres, CSRF via trusted origins, protected dashboard.
+- **Admin dashboard** — shadcn-style sidebar, theme switcher (light/dark/system), and account menu.
+
+## Architecture
+
+- **Web** — Next.js app (dashboard, auth, API routes). Conversions are proxied from `app/api/convert*` to the processing service over an internal network, gated by a shared secret.
+- **Processing service** (`server/`) — a Python [FastAPI](https://fastapi.tiangolo.com/) wrapper around `markitdown[all]` with `/convert` (uploads) and `/convert-url` (SSRF-guarded). Internal-only.
+- **Postgres** — users, sessions, and converted documents (Drizzle ORM).
+- **Redis** — reserved for the job queue / session store.
+
 ## Tech stack
 
 - [Next.js 15](https://nextjs.org/) (App Router) + [React 19](https://react.dev/)
-- [Tailwind CSS v4](https://tailwindcss.com/)
+- [Tailwind CSS v4](https://tailwindcss.com/) + [Tailwind Typography](https://github.com/tailwindlabs/tailwindcss-typography)
 - Strict [TypeScript](https://www.typescriptlang.org/) with [ts-reset](https://github.com/total-typescript/ts-reset)
-- [Radix UI](https://www.radix-ui.com/) + [CVA](https://cva.style/) for the design system
-- [ESLint 9](https://eslint.org/) and [Prettier](https://prettier.io/)
-- Testing: [Vitest](https://vitest.dev), [React Testing Library](https://testing-library.com/react), and [Playwright](https://playwright.dev/)
-- [Storybook](https://storybook.js.org/) for component development
-- [OpenTelemetry](https://opentelemetry.io/) observability and Kubernetes-compatible health checks
-- [T3 Env](https://env.t3.gg/) for typed environment variables
+- [Radix UI](https://www.radix-ui.com/) + [CVA](https://cva.style/) design system; [react-markdown](https://github.com/remarkjs/react-markdown) + [remark-gfm](https://github.com/remarkjs/remark-gfm), [Shiki](https://shiki.style/), [sonner](https://sonner.emilkowal.ski/)
+- [better-auth](https://www.better-auth.com/) + [Drizzle ORM](https://orm.drizzle.team/) + PostgreSQL
+- Processing: [Python](https://www.python.org/) 3.10+ / [FastAPI](https://fastapi.tiangolo.com/) / [MarkItDown](https://github.com/microsoft/markitdown)
+- Testing: [Vitest](https://vitest.dev), [React Testing Library](https://testing-library.com/react), [Playwright](https://playwright.dev/), [pytest](https://docs.pytest.org/)
+- [T3 Env](https://env.t3.gg/) for typed environment variables; [OpenTelemetry](https://opentelemetry.io/) + Kubernetes-compatible health checks
 
 ## Requirements
 
-- [Node.js](https://nodejs.org/) `>=20`
-- [npm](https://www.npmjs.com/) (the project's package manager)
+- [Node.js](https://nodejs.org/) `>=22` and [npm](https://www.npmjs.com/) (the project's package manager)
+- [Docker](https://www.docker.com/) + Docker Compose (for Postgres/Redis and the full-stack deploy)
+- [Python](https://www.python.org/) `>=3.10` (only if running the processing service outside Docker)
 
 ## Getting started
 
-Install dependencies:
-
 ```bash
-npm install
-```
+# 1. Install deps (a better-auth peer requires legacy-peer-deps)
+npm install --legacy-peer-deps
 
-Run the development server:
+# 2. Configure env
+cp .env.example .env   # then fill in secrets (BETTER_AUTH_SECRET, MARKITDOWN_SERVICE_TOKEN, DB creds…)
 
-```bash
+# 3. Bring up Postgres, Redis and the MarkItDown service
+docker compose up -d postgres redis markitdown
+
+# 4. Run the web app (auto-creates the DB + applies migrations)
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) to view the app.
+Open [http://localhost:3000](http://localhost:3000). Register, then convert from **Convert** in the sidebar; view results in **Library** and originals in **Documents**.
+
+> Running the processing service without Docker: `cd server && python3.12 -m venv .venv && ./.venv/bin/pip install -r requirements-dev.txt && MARKITDOWN_SERVICE_TOKEN=<token> ./.venv/bin/uvicorn app.main:app --port 8000`
 
 ## Scripts
 
 | Command                 | Description                                  |
 | ----------------------- | -------------------------------------------- |
-| `npm run dev`           | Start the development server                 |
-| `npm run build`         | Create a production build                    |
-| `npm run start`         | Start the production server                  |
+| `npm run dev`           | Ensure DB + migrate, then start the dev server |
+| `npm run build`         | Create a production build                     |
+| `npm run start`         | Start the production server                   |
+| `npm run typecheck`     | Type-check with `tsc`                         |
 | `npm run lint`          | Run ESLint                                    |
-| `npm run lint:fix`      | Run ESLint and auto-fix                       |
-| `npm run prettier`      | Check formatting                              |
-| `npm run prettier:fix`  | Format the codebase                           |
 | `npm run test`          | Run unit & integration tests (Vitest)        |
 | `npm run e2e:headless`  | Run end-to-end tests (Playwright)            |
+| `npm run db:generate`   | Generate a Drizzle migration from the schema |
+| `npm run db:migrate`    | Apply migrations                             |
+| `npm run db:studio`     | Open Drizzle Studio                          |
 | `npm run storybook`     | Start Storybook on port 6006                  |
-| `npm run analyze`       | Build with the bundle analyzer enabled        |
+
+Processing-service tests: `cd server && ./.venv/bin/python -m pytest`.
 
 ## Deployment
 
-TokenItDown is packaged with Docker. The self-hosted edition ships as a `docker compose` bundle (web + api + worker + Postgres + Redis + processing service) so it runs fully local with no data egress.
+The self-hosted edition ships as a `docker compose` bundle — **web + Postgres + Redis + the MarkItDown processing service**. On the host, copy `.env.example` → `.env`, set real secrets (including `MARKITDOWN_SERVICE_TOKEN`), then:
 
-> Docker / `docker compose` setup is being added — see the project plan for the build phases.
+```bash
+./deploy.sh
+```
+
+This builds the images and brings the stack up; the web container waits for the processing service, ensures the database, and runs migrations on startup. App at `http://<host>:${WEB_PORT:-3030}`.
 
 ## License
 

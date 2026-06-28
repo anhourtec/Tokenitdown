@@ -4,7 +4,7 @@
 
 **Project:** TokenItDown — document & web → LLM-ready Markdown platform
 **Company:** AnHourTec · **Package manager:** npm only
-**Last updated:** 2026-06-27
+**Last updated:** 2026-06-28
 
 ---
 
@@ -291,10 +291,17 @@ before the next Docker deploy. Dev (`npm run dev`) is unaffected.
   CLI if plugins change, then `npm run db:generate`.
 
 ## Next Steps
-1. **Deploy:** on the server (192.168.69.16) copy `.env.example` → `.env`, set real
-   passwords + `BETTER_AUTH_URL=http://192.168.69.16:3030` (match WEB_PORT), run `./deploy.sh`
-   (builds the web image + brings up web/Postgres/Redis; migrations run on web
-   startup). App at `http://192.168.69.16:3030` (or your WEB_PORT). Locally you can `npm run dev`.
+1. **Fix the Docker prerender 404 (blocker for Docker deploy):** auth-gated dashboard
+   child routes (`/dashboard/convert/*`, `/dashboard/library`, `/dashboard/documents`)
+   get baked into cached 404s by `next build` in the Docker image, even with
+   `force-dynamic` on `app/dashboard/layout.tsx` (which fixes it for local
+   `next start`). Works fine in `npm run dev`. Investigate before the next
+   `./deploy.sh` — likely a build-time static-generation pass hitting the auth
+   layout with no DB. Until then, develop/demo on dev.
+2. **Deploy (after #1):** on the server copy `.env.example` → `.env`, set real
+   passwords + `MARKITDOWN_SERVICE_TOKEN` + `BETTER_AUTH_URL` (match WEB_PORT),
+   run `./deploy.sh` (builds web + markitdown images, brings up web/Postgres/Redis/
+   markitdown; migrations run on web startup).
 2. **Layer the rest of auth (PLAN §4.6):** email verification, password reset,
    2FA (TOTP + email OTP), rate limiting, audit log, session rotation. better-auth
    has plugins for most of this — wire them in `lib/auth.ts` and regenerate the

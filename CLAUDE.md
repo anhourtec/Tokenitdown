@@ -39,6 +39,9 @@ Do exactly what was asked — no scope creep, no unrequested refactors. But fini
 ### 8. Update `HANDOFF.md` before every commit
 Before running `git commit`, update `HANDOFF.md` so it reflects the work being committed (progress, what worked, what didn't, next steps). The handoff must never lag behind the commit history. Do this automatically — it should never need to be asked for.
 
+### 9. Test everything with Playwright MCP when a task is done
+When a task is complete, verify it end-to-end in a real browser using the **Playwright MCP** tools (`mcp__playwright__*`) — not just the unit/e2e suites. Drive the actual flow the user cares about (log in, navigate, upload, convert, view, delete, etc.), confirm the rendered result and interactions work, and check the console for errors. Do this against the running dev server (`npm run dev`, currently `http://localhost:3000`; use the LAN origin if better-auth's trusted-origin check requires it). Don't declare a task finished until it's been exercised this way.
+
 ---
 
 ## High-level architecture
@@ -51,7 +54,10 @@ Before running `git commit`, update `HANDOFF.md` so it reflects the work being c
 - **Observability:** OpenTelemetry via `@vercel/otel`, registered in `instrumentation.ts`
 - **Testing:** Vitest + React Testing Library (unit/integration), Playwright (e2e), Storybook (component dev)
 - **Tooling:** ESLint 9 + Prettier, bundle analyzer, semantic-release
-- **Deployment:** Docker + `docker compose` (web + api + worker + Postgres + Redis + processing service) — not yet scaffolded
+- **Auth & data:** better-auth (email/password, cookie sessions) + Drizzle ORM + PostgreSQL
+- **Processing service:** Python FastAPI wrapping `markitdown[all]` (in `server/`) — converts uploads/URLs to Markdown
+- **Markdown UI:** `react-markdown` + `remark-gfm` + Tailwind Typography (rendered preview), `shiki` (raw/code), `sonner` (toasts)
+- **Deployment:** Docker + `docker compose` (web + Postgres + Redis + markitdown processing service); `./deploy.sh` builds and runs the full stack
 
 ### Directory layout
 - `app/` — App Router routes, layouts, and API route handlers (`app/api/*`)
