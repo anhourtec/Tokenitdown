@@ -85,7 +85,7 @@ export const sidebarItems: NavGroup[] = [
     id: 2,
     label: "AI",
     items: [
-      { id: "rag", title: "RAG Export", url: "/dashboard/rag", icon: Boxes, badge: "new" },
+      { id: "rag", title: "RAG Export", url: "/dashboard/rag", icon: Boxes },
       { id: "analytics", title: "Analytics", url: "/dashboard/analytics", icon: Gauge },
     ],
   },
@@ -94,7 +94,7 @@ export const sidebarItems: NavGroup[] = [
     label: "Settings",
     items: [
       { id: "integrations", title: "Integrations", url: "#", icon: Plug, badge: "soon", disabled: true },
-      { id: "settings", title: "Settings", url: "#", icon: Settings },
+      { id: "settings", title: "Settings", url: "/dashboard/settings", icon: Settings },
     ],
   },
 ]

@@ -5,6 +5,7 @@ import { saveDocument } from "@/lib/documents"
 import { cleanMarkdown } from "@/lib/markdown/clean"
 import { tokenSavings } from "@/lib/markdown/tokens"
 import { ConversionError, convertFile } from "@/lib/markitdown-client"
+import { getPreferences } from "@/lib/preferences"
 
 import { env } from "../../../env.mjs"
 
@@ -40,7 +41,10 @@ export async function POST(req: Request) {
   }
 
   const bytes = Buffer.from(await file.arrayBuffer())
-  const tier = form.get("tier") === "compact" ? "compact" : "clean"
+  const prefs = await getPreferences(session.user.id)
+  // Explicit ?tier wins (API callers); otherwise use the user's saved default.
+  const formTier = form.get("tier")
+  const tier = formTier === "compact" ? "compact" : formTier === "clean" ? "clean" : prefs.defaultCleanTier
 
   try {
     const { markdown: raw, title } = await convertFile(bytes, file.name, file.type)
@@ -58,6 +62,8 @@ export async function POST(req: Request) {
       rawTokens: tokens.rawTokens,
       cleanTokens: tokens.cleanTokens,
       cleanStats: stats,
+      // Always persist the original; `storeOriginals` only controls whether it's
+      // shown on the dashboard (see the Documents page).
       original: { bytes, filename: file.name || "upload" },
     })
     return Response.json({ id: doc.id, title: doc.title, markdown, tokens, cleanStats: stats })

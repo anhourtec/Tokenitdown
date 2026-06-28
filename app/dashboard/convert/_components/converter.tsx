@@ -62,7 +62,6 @@ export function Converter({ format, maxUploadBytes }: { format: ConverterFormat;
   const [url, setUrl] = React.useState("")
   const [urlBusy, setUrlBusy] = React.useState(false)
   const [dragging, setDragging] = React.useState(false)
-  const [tier, setTier] = React.useState<"clean" | "compact">("clean")
   const inputRef = React.useRef<HTMLInputElement>(null)
 
   const update = React.useCallback((id: string, patch: Partial<Job>) => {
@@ -83,7 +82,6 @@ export function Converter({ format, maxUploadBytes }: { format: ConverterFormat;
       try {
         const form = new FormData()
         form.append("file", file)
-        form.append("tier", tier)
         const res = await fetch("/api/convert", { method: "POST", body: form })
         const body = (await res.json()) as ConvertResponse
         if (!res.ok) throw new Error(body?.error ?? `Conversion failed (${res.status})`)
@@ -99,7 +97,7 @@ export function Converter({ format, maxUploadBytes }: { format: ConverterFormat;
         update(id, { status: "error", error: (err as Error).message })
       }
     },
-    [maxUploadBytes, tier, update]
+    [maxUploadBytes, update]
   )
 
   const handleFiles = React.useCallback(
@@ -120,7 +118,7 @@ export function Converter({ format, maxUploadBytes }: { format: ConverterFormat;
       const res = await fetch("/api/convert/url", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: trimmed, tier }),
+        body: JSON.stringify({ url: trimmed }),
       })
       const body = (await res.json()) as ConvertResponse
       if (!res.ok) throw new Error(body?.error ?? `Conversion failed (${res.status})`)
@@ -138,35 +136,10 @@ export function Converter({ format, maxUploadBytes }: { format: ConverterFormat;
     } finally {
       setUrlBusy(false)
     }
-  }, [url, urlBusy, tier, update])
+  }, [url, urlBusy, update])
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-lg border bg-muted/30 px-3 py-2">
-        <div className="flex flex-col">
-          <span className="font-medium text-sm">Cleaning</span>
-          <span className="text-muted-foreground text-xs">
-            {tier === "compact"
-              ? "Compact — strips link URLs and extra chrome for the biggest token savings (lossy)."
-              : "Clean — lossless tidy-up: structure kept, boilerplate removed."}
-          </span>
-        </div>
-        <div className="flex items-center rounded-md border p-0.5">
-          {(["clean", "compact"] as const).map((t) => (
-            <button
-              key={t}
-              type="button"
-              onClick={() => setTier(t)}
-              className={cn(
-                "rounded px-3 py-1 text-xs font-medium capitalize transition-colors",
-                tier === t ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              {t}
-            </button>
-          ))}
-        </div>
-      </div>
       {format.mode === "file" ? (
         <Card>
           <CardContent className="pt-6">

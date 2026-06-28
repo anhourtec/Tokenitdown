@@ -5,6 +5,7 @@ import { saveDocument } from "@/lib/documents"
 import { cleanMarkdown } from "@/lib/markdown/clean"
 import { tokenSavings } from "@/lib/markdown/tokens"
 import { ConversionError, convertUrl } from "@/lib/markitdown-client"
+import { getPreferences } from "@/lib/preferences"
 
 export const runtime = "nodejs"
 
@@ -16,10 +17,12 @@ export async function POST(req: Request) {
 
   const body = (await req.json().catch(() => null)) as { url?: unknown; tier?: unknown } | null
   const url = typeof body?.url === "string" ? body.url.trim() : ""
-  const tier = body?.tier === "compact" ? "compact" : "clean"
   if (!url) {
     return Response.json({ error: "A 'url' is required." }, { status: 400 })
   }
+
+  const prefs = await getPreferences(session.user.id)
+  const tier = body?.tier === "compact" ? "compact" : body?.tier === "clean" ? "clean" : prefs.defaultCleanTier
 
   try {
     const { markdown: raw, title } = await convertUrl(url)
