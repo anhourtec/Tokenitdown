@@ -59,8 +59,8 @@ export const sidebarItems: NavGroup[] = [
     label: "Workspace",
     items: [
       { id: "dashboard", title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
-      { id: "library", title: "Library", url: "#", icon: FolderOpen },
-      { id: "convert", title: "Convert", url: "#", icon: Upload },
+      { id: "convert", title: "Convert", url: "/dashboard/convert", icon: Upload },
+      { id: "library", title: "Library", url: "/dashboard/library", icon: FolderOpen },
       { id: "documents", title: "Documents", url: "#", icon: FileText },
     ],
   },
