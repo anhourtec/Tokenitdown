@@ -1,6 +1,7 @@
-import type { PageAnalysis, WorkerToContentMessage } from "./types";
+import type { PageAnalysis, Region, WorkerToContentMessage } from "./types";
 import { extractMarkdown } from "./lib/extract";
 import { collectSignals, decideRoute } from "./lib/route";
+import { collectRegions, injectPlaceholders } from "./lib/regions";
 
 // Tracks elements we hid so we can restore them
 let hiddenElements: Array<{ el: HTMLElement; prevVisibility: string }> = [];
@@ -47,14 +48,30 @@ chrome.runtime.onMessage.addListener(
 
 /**
  * Extracts the page's Markdown, scores it against DOM signals, and routes it to
- * the DOM / vision / hybrid pipeline (M2). Returned to the service worker as the
- * `EXTRACT_MARKDOWN` response.
+ * the DOM / vision / hybrid pipeline (M2). On a `hybrid` page it also finds the
+ * visual regions and re-extracts with inline placeholder tokens at each region's
+ * position (M3), so the service worker can splice in descriptions after cropping.
+ * Returned to the service worker as the `EXTRACT_MARKDOWN` response.
  */
 function analyzePage(): PageAnalysis {
   const extract = extractMarkdown(document, location.href);
   const signals = collectSignals(document, extract);
   const route = decideRoute(signals);
-  return { extract, signals, route };
+
+  // Routing is decided on the clean extraction above; only hybrid pages need the
+  // region pass, so the placeholder text never contaminates the routing signals.
+  let regions: Region[] = [];
+  let markdown = extract.markdown;
+  if (route.path === "hybrid") {
+    regions = collectRegions(document);
+    if (regions.length > 0) {
+      const clone = document.cloneNode(true) as Document;
+      injectPlaceholders(clone, regions);
+      markdown = extractMarkdown(clone, location.href).markdown;
+    }
+  }
+
+  return { extract: { ...extract, markdown }, signals, route, regions };
 }
 
 function getPageMetrics() {

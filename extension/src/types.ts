@@ -63,15 +63,51 @@ export interface RouteDecision {
   reason: string;
 }
 
+/** A visual region (chart/canvas/figure/image) identified on a `hybrid` page,
+ *  to be cropped from the screenshot and described inline (M3). */
+export type RegionKind = "canvas" | "svg" | "figure" | "image";
+
+/** A region's box in CSS pixels, in page coordinates (includes scroll offset). */
+export interface RegionRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface Region {
+  /** Stable id used in the Markdown placeholder token and to match its crop. */
+  id: number;
+  /** Index of this region's element among all region candidates in document
+   *  order — used to find the same element in the (layout-less) extraction
+   *  clone when injecting placeholders. */
+  sourceIndex: number;
+  kind: RegionKind;
+  rect: RegionRect;
+  /** Best available text label (figcaption / alt / aria-label / svg <title>). */
+  label: string | null;
+}
+
+/** A region cropped out of the full-page screenshot, in device pixels. */
+export interface RegionCrop {
+  id: number;
+  /** `data:image/png;base64,...` of just this region. */
+  dataUrl: string;
+  width: number;
+  height: number;
+}
+
 /**
  * Full analysis of a page returned by the content script's `EXTRACT_MARKDOWN`
- * handler: the DOM extraction plus the signals it was scored on and the routing
- * decision. Downstream milestones (M3 hybrid, M4 clean) consume `route`/`signals`.
+ * handler: the DOM extraction plus the signals it was scored on, the routing
+ * decision, and — on `hybrid` pages — the visual regions whose placeholders are
+ * embedded inline in `extract.markdown` (M3). Downstream M4 (clean) consumes these.
  */
 export interface PageAnalysis {
   extract: ExtractResult;
   signals: PageSignals;
   route: RouteDecision;
+  regions: Region[];
 }
 
 // Popup → Service Worker
@@ -88,6 +124,8 @@ export type WorkerMessage =
       markdown: string;
       title: string;
       route: RouteDecision;
+      /** Number of visual regions described inline (hybrid pages; 0 otherwise). */
+      regions: number;
     }
   | { type: "CAPTURE_ERROR"; error: string };
 

@@ -26,7 +26,7 @@ port.onMessage.addListener((msg: WorkerMessage) => {
       break;
 
     case "CAPTURE_DONE":
-      showResult(msg.dataUrl, msg.markdown, msg.title, msg.route);
+      showResult(msg.dataUrl, msg.markdown, msg.title, msg.route, msg.regions);
       break;
 
     case "CAPTURE_ERROR":
@@ -54,7 +54,8 @@ function showResult(
   dataUrl: string,
   markdown: string,
   title: string,
-  route: RouteDecision
+  route: RouteDecision,
+  regions: number
 ) {
   statusEl.classList.add("hidden");
   captureBtn.disabled = false;
@@ -62,7 +63,7 @@ function showResult(
   previewImg.src = dataUrl;
   downloadLink.href = dataUrl;
 
-  showRoute(route);
+  showRoute(route, regions);
 
   // Back the Markdown download with a Blob object URL rather than a giant
   // data: URL — more memory-efficient for long pages. Revoke the previous one.
@@ -84,9 +85,11 @@ const ROUTE_LABELS: Record<RouteDecision["path"], string> = {
   hybrid: "Hybrid",
 };
 
-/** Renders the router's decision as a colored badge with a tooltip explaining why. */
-function showRoute(route: RouteDecision) {
-  routeBadge.textContent = `${ROUTE_LABELS[route.path]} path`;
+/** Renders the router's decision as a colored badge with a tooltip explaining why.
+ *  On hybrid pages it also notes how many visual regions were described inline. */
+function showRoute(route: RouteDecision, regions: number) {
+  const suffix = regions > 0 ? ` · ${regions} region${regions === 1 ? "" : "s"}` : "";
+  routeBadge.textContent = `${ROUTE_LABELS[route.path]} path${suffix}`;
   routeBadge.title = route.reason;
   routeBadge.dataset.path = route.path;
   routeBadge.classList.remove("hidden");

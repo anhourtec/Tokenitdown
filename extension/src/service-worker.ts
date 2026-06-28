@@ -9,6 +9,9 @@ import type {
 } from "./types";
 import { stitch } from "./lib/stitch";
 import { captureFrames } from "./lib/screenshot";
+import { cropRegions } from "./lib/crop";
+import { describeRegions, metadataDescriber } from "./lib/describe";
+import { spliceDescriptions } from "./lib/regions";
 
 // Delay between scroll and capture to let lazy-loaded content settle
 const SCROLL_SETTLE_MS = 150;
@@ -81,12 +84,22 @@ async function handleStartCapture() {
     // Stitch frames into a single PNG
     const dataUrl = await stitch(frames, metrics);
 
+    // M3 — on hybrid pages, crop each visual region from the screenshot, describe
+    // it, and splice the description into the Markdown where its placeholder sits.
+    const markdown = await describeRegionsInline(
+      analysis.extract.markdown,
+      analysis.regions,
+      dataUrl,
+      metrics
+    );
+
     sendToPopup({
       type: "CAPTURE_DONE",
       dataUrl,
-      markdown: analysis.extract.markdown,
+      markdown,
       title: analysis.extract.title,
       route: analysis.route,
+      regions: analysis.regions.length,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -127,6 +140,30 @@ function requestPageMetrics(tabId: number): Promise<PageMetrics> {
     chrome.runtime.onMessage.addListener(listener);
     sendToContent(tabId, { type: "GET_PAGE_METRICS" });
   });
+}
+
+/**
+ * Crops each region from the full-page screenshot, describes it (default
+ * metadata describer — a vision provider plugs into the same interface), and
+ * splices the descriptions into the Markdown at their placeholders. Best-effort:
+ * on any failure, placeholders are stripped so the Markdown is still clean.
+ */
+async function describeRegionsInline(
+  markdown: string,
+  regions: PageAnalysis["regions"],
+  screenshotDataUrl: string,
+  metrics: PageMetrics
+): Promise<string> {
+  if (regions.length === 0) return markdown;
+  try {
+    const crops = await cropRegions(screenshotDataUrl, regions, metrics);
+    const cropById = new Map(crops.map((c) => [c.id, c]));
+    const descriptions = await describeRegions(regions, cropById, metadataDescriber);
+    return spliceDescriptions(markdown, descriptions);
+  } catch (err) {
+    console.warn("[TokenItDown] region description failed:", err);
+    return spliceDescriptions(markdown, new Map());
+  }
 }
 
 function requestMarkdown(tabId: number): Promise<PageAnalysis> {

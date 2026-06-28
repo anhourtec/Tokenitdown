@@ -1,6 +1,6 @@
 # Extension Testing Handoff
 
-**Last updated:** 2026-06-27 (after M2 — page router: DOM / vision / hybrid)
+**Last updated:** 2026-06-27 (after M3 — hybrid vision-assist: region crop + inline describe)
 **Branch:** `extension`
 **Scope:** Testing the Chrome extension (`extension/`) — what was done, what works, what's still unverified, and exactly where to continue.
 
@@ -21,7 +21,10 @@ The Chrome MV3 extension lives entirely under `extension/`. It captures a full-p
 | `src/lib/stitch.ts` | Pure logic: `stitch()` — composites frames onto an `OffscreenCanvas`, returns a PNG data URL |
 | `src/lib/extract.ts` | Pure logic: `extractMarkdown(doc, url)` — Readability main-content extraction → Turndown (GFM) → clean Markdown. Returns `ExtractResult` |
 | `src/lib/route.ts` | M2 router: `collectSignals(doc, extract)` reads DOM signals (text length, readability, canvas/svg/img counts + area ratios, link density); pure `decideRoute(signals)` → `RouteDecision` (`dom` / `vision` / `hybrid`) |
-| `src/types.ts` | Shared message type definitions (pure TypeScript interfaces, no Chrome API usage) — incl. `PageSignals`, `RouteDecision`, `PageAnalysis` |
+| `src/lib/regions.ts` | M3: `collectRegions(doc)` finds visual regions (canvas/svg/figure/img, size-filtered, deduped) with page rects + labels; `injectPlaceholders(clone, regions)` puts inline tokens at each region's spot; `spliceDescriptions(md, descs)` swaps tokens for descriptions |
+| `src/lib/crop.ts` | M3: pure `regionPixelRect()` (CSS→device px, clamped) + `cropRegions(screenshotPng, regions, metrics)` — crops each region out of the stitched PNG via `OffscreenCanvas` |
+| `src/lib/describe.ts` | M3: `RegionDescriber` provider interface + default `metadataDescriber` (caption/alt/dimensions, no model) + `describeRegions()` helper. A vision/LLM provider plugs in here |
+| `src/types.ts` | Shared message type definitions (pure TypeScript interfaces, no Chrome API usage) — incl. `PageSignals`, `RouteDecision`, `PageAnalysis`, `Region`, `RegionCrop` |
 | `src/types/turndown-plugin-gfm.d.ts` | Minimal type decl for `turndown-plugin-gfm` (ships no types) |
 
 ### Build & test
@@ -29,7 +32,7 @@ The Chrome MV3 extension lives entirely under `extension/`. It captures a full-p
 cd extension && npm run build     # rebuilds dist/ (copies public/ → dist/, incl. icons)
 cd extension && npm run typecheck # zero TS errors
 # unit tests run from the repo root via Vitest:
-npx vitest run extension/src/lib   # screenshot (7) + extract (6) + route (12) = 25 tests
+npx vitest run extension/src/lib   # screenshot 7 + extract 6 + route 12 + regions 9 + crop 6 + describe 5 = 45 tests
 npm run e2e:extension              # 3 Playwright e2e tests (loads the unpacked extension)
 ```
 
@@ -44,10 +47,12 @@ npm run e2e:extension              # 3 Playwright e2e tests (loads the unpacked 
 | `extension/src/lib/screenshot.test.ts` — 7 unit tests | ✅ All pass |
 | `extension/src/lib/extract.test.ts` — 6 unit tests (DOM→MD) | ✅ All pass |
 | `extension/src/lib/route.test.ts` — 12 unit tests (M2 router) | ✅ All pass |
-| `e2e/extension.spec.ts` — 3 Playwright e2e tests | ✅ All pass (2.1s) |
+| `extension/src/lib/{regions,crop,describe}.test.ts` — 20 unit tests (M3) | ✅ All pass |
+| `e2e/extension.spec.ts` — 3 Playwright e2e tests | ✅ All pass (1.7s) |
 | `playwright.extension.config.ts` + npm script | ✅ In place |
 | M1 DOM→Markdown — live-verified in real Chrome + security review | ✅ Clean |
 | M2 router — live-verified in real Chrome (3/3 routes) + security review | ✅ Clean |
+| M3 hybrid region crop + inline describe — live-verified + security review | ✅ Clean |
 
 ### Resolution of the "Chrome launch crash" (session 2026-06-27)
 
@@ -471,10 +476,81 @@ branches on.
 - `/security-review` — **clean, no findings.** `route.reason` is built only from
   numeric signals (no page text), and the popup badge uses non-HTML sinks.
 
+### Milestone M3 — Hybrid Vision-Assist ✅ DONE (2026-06-27)
+
+For pages the M2 router flags `hybrid` (real text *and* significant visual
+regions), detect those regions, crop them from the full-page screenshot, describe
+each, and splice the description **inline** where the region sat in the Markdown.
+
+**Decision (this session):** built the deterministic core now behind a
+`describeRegion()` provider interface, with a **default no-model describer**
+(`metadataDescriber`: figcaption / alt / aria-label, else kind + dimensions) so
+the feature ships complete and testable today. A vision/LLM provider plugs into
+the same interface later — see "Wiring a vision provider" below.
+
+**What was built:**
+- `lib/regions.ts`:
+  - `collectRegions(doc)` — finds `canvas / svg / figure / img` regions in the
+    live DOM (needs layout for rects), deduped (a `<figure>` represents its inner
+    media; nested `<svg>` dropped), size-filtered (`figure` always kept; others
+    ≥200×150 CSS px to skip icons), each with a page-coordinate `rect` and a text
+    `label` (figcaption / alt / aria-label / svg `<title>`).
+  - `injectPlaceholders(clone, regions)` — on the extraction clone (which has no
+    layout, so we map regions to clone elements by document-order `sourceIndex`),
+    replaces each region element with `<p>TIDREGION<id>ENDREGION</p>` (a pure-
+    alphanumeric token that survives Readability and is never escaped by Turndown),
+    landing the token **inline** at the region's position.
+  - `spliceDescriptions(md, Map<id, desc>)` — swaps each token for its description;
+    tokens with no description are stripped and blank lines collapsed (clean fallback).
+- `lib/crop.ts` — pure `regionPixelRect(rect, dpr, w, h)` (CSS→device px, clamped
+  to image bounds; `null` when a region falls outside the 16384px-capped PNG) +
+  `cropRegions(screenshotPng, regions, metrics)` cropping each region via `OffscreenCanvas`.
+- `lib/describe.ts` — `RegionDescriber` interface, default `metadataDescriber`
+  (emits `> **Chart\|Figure\|Image:** <label or dims>`), and `describeRegions()`
+  (pairs each region with its crop, calls the describer sequentially).
+- `content-script.ts` — `analyzePage()` routes on the **clean** extraction first
+  (so placeholder text never skews M2 signals); only for `hybrid` does it
+  `collectRegions`, clone + `injectPlaceholders`, and re-extract with tokens inline.
+  Returns `regions` in `PageAnalysis`.
+- `service-worker.ts` — after stitching, `describeRegionsInline()` crops → describes
+  → splices; best-effort (any failure strips tokens to keep Markdown clean). Forwards
+  the region count to the popup.
+- `popup.ts` — route badge now appends `· N regions` on hybrid pages (count only —
+  no page text rendered).
+- `types.ts` — `Region`, `RegionKind`, `RegionRect`, `RegionCrop`; `PageAnalysis.regions`;
+  `CAPTURE_DONE.regions` (count).
+
+**Verification:**
+- `npx vitest run extension/src/lib` — **45/45 pass** (M3 adds 20: regions 9 —
+  detection/dedupe/size-threshold/label, inject+extract integration, splice; crop 6 —
+  `regionPixelRect` scaling/clamping/out-of-bounds; describe 5 — `metadataDescriber`
+  formats + crop pass-through).
+- **Live-verified in real Chrome** (region rects need real layout): served a hybrid
+  page (prose + captioned `figure>canvas` + a large labelled `img` + a small icon)
+  and called `EXTRACT_MARKDOWN` — routed `hybrid`, detected exactly 2 regions
+  (figure + image; icon correctly filtered), labels read from figcaption/alt, rects
+  matched real layout (figure 680×421 incl. caption, image 420×300), and both
+  placeholder tokens landed inline between the surrounding paragraphs. The post-
+  splice output reads e.g. `> **Figure:** Revenue by quarter (FY26)` exactly where
+  the chart was. (The full screenshot→crop path can't run headless without the
+  `activeTab` toolbar gesture; crop math is unit-tested and the `OffscreenCanvas`
+  crop reuses the same pattern `stitch()` already proves in production.)
+- `npm run build` + `typecheck` clean; `e2e/extension.spec.ts` still 3/3.
+- `/security-review` — **clean, no findings.** Region labels / spliced descriptions
+  are untrusted page text but only ever land in the **download-only** Markdown Blob
+  (no HTML sink); the badge shows a numeric count; `cropRegions` only fetches the
+  extension's own `data:` screenshot (no SSRF). ⚠️ Same caveat as M1 carries forward:
+  if a future milestone renders Markdown as HTML in-popup, sanitize it (DOMPurify).
+
+**Wiring a vision provider next (M3b):** implement a `RegionDescriber` that sends
+`crop.dataUrl` to a model and returns its text, then pass it instead of
+`metadataDescriber` in `service-worker.ts`'s `describeRegionsInline`. Provider
+location is still an open decision (no LLM backend/key exists yet): Next.js
+`/api/describe` route (key server-side), direct Anthropic from the extension
+(user key in storage), or local Ollama (llava). The crop pipeline already feeds
+`crop.dataUrl` to the describer, so only the provider body changes.
+
 **Not yet done / next milestones:**
-- **M3 — Hybrid vision-assist.** Crop chart/canvas/figure regions from the existing
-  full-page screenshot (we already track scroll offsets) → vision descriptions
-  spliced into the DOM Markdown. Token-cheap: vision only for visual regions.
 - **M4 — Clean stage.** Boilerplate strip + token compressor (the PLAN.md hero).
 - **M5 — Screenshot quality (Strategy A CDP).** Matters more now: crops feed M3.
 - Wire `page.md` + `screenshot.png` into the authenticated bundle upload (PLAN.md).
