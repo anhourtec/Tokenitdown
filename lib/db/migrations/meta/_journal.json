@@ -8,6 +8,13 @@
       "when": 1782524413766,
       "tag": "0000_hesitant_marvel_apes",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1782616825701,
+      "tag": "0001_chief_black_bolt",
+      "breakpoints": true
     }
   ]
 }

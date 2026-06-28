@@ -1,4 +1,4 @@
-import { boolean, pgTable, text, timestamp } from "drizzle-orm/pg-core"
+import { boolean, index, integer, pgTable, text, timestamp } from "drizzle-orm/pg-core"
 
 /**
  * better-auth core schema (email/password + sessions).
@@ -58,4 +58,31 @@ export const verification = pgTable("verification", {
   updatedAt: timestamp("updatedAt").defaultNow(),
 })
 
-export const schema = { user, session, account, verification }
+/**
+ * Converted documents. Each row is one MarkItDown conversion belonging to a user:
+ * the resulting Markdown plus metadata about the source. The original file (when
+ * the source was an upload) is stored on disk at `storagePath` (under STORAGE_DIR).
+ */
+export const document = pgTable(
+  "document",
+  {
+    id: text("id").primaryKey(),
+    userId: text("userId")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    // "file" (uploaded) or "url" (web page / YouTube).
+    sourceType: text("sourceType").notNull(),
+    // Original filename or the source URL.
+    sourceName: text("sourceName").notNull(),
+    mimetype: text("mimetype"),
+    sizeBytes: integer("sizeBytes").notNull().default(0),
+    // Relative path of the stored original under STORAGE_DIR; null for URL sources.
+    storagePath: text("storagePath"),
+    markdown: text("markdown").notNull(),
+    createdAt: timestamp("createdAt").notNull().defaultNow(),
+  },
+  (table) => [index("document_userId_idx").on(table.userId)]
+)
+
+export const schema = { user, session, account, verification, document }
