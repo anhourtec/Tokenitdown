@@ -97,6 +97,23 @@ export interface RegionCrop {
   height: number;
 }
 
+/** Result of the M4 clean stage: the cleaned Markdown and how many lines were
+ *  dropped as boilerplate/duplicates. */
+export interface CleanResult {
+  markdown: string;
+  removedLines: number;
+}
+
+/** Token economics for the output (M4). Counts are estimates (~4 chars/token),
+ *  labelled `≈` in the UI; a precise per-model tokenizer can swap in later. */
+export interface TokenStats {
+  before: number;
+  after: number;
+  saved: number;
+  /** Percentage of tokens removed by cleaning, 0–100. */
+  savedPct: number;
+}
+
 /**
  * Full analysis of a page returned by the content script's `EXTRACT_MARKDOWN`
  * handler: the DOM extraction plus the signals it was scored on, the routing
@@ -126,6 +143,8 @@ export type WorkerMessage =
       route: RouteDecision;
       /** Number of visual regions described inline (hybrid pages; 0 otherwise). */
       regions: number;
+      /** Token estimate before/after the clean stage (M4). */
+      tokens: TokenStats;
     }
   | { type: "CAPTURE_ERROR"; error: string };
 

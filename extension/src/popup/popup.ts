@@ -1,4 +1,4 @@
-import type { PopupMessage, RouteDecision, WorkerMessage } from "../types";
+import type { PopupMessage, RouteDecision, TokenStats, WorkerMessage } from "../types";
 
 const captureBtn = document.getElementById("capture-btn") as HTMLButtonElement;
 const statusEl = document.getElementById("status") as HTMLDivElement;
@@ -9,6 +9,7 @@ const previewImg = document.getElementById("preview") as HTMLImageElement;
 const downloadLink = document.getElementById("download-link") as HTMLAnchorElement;
 const downloadMd = document.getElementById("download-md") as HTMLAnchorElement;
 const routeBadge = document.getElementById("route-badge") as HTMLDivElement;
+const tokenStats = document.getElementById("token-stats") as HTMLDivElement;
 const errorEl = document.getElementById("error") as HTMLDivElement;
 
 // Tracks the object URL backing the Markdown download so we can revoke it when
@@ -26,7 +27,7 @@ port.onMessage.addListener((msg: WorkerMessage) => {
       break;
 
     case "CAPTURE_DONE":
-      showResult(msg.dataUrl, msg.markdown, msg.title, msg.route, msg.regions);
+      showResult(msg.dataUrl, msg.markdown, msg.title, msg.route, msg.regions, msg.tokens);
       break;
 
     case "CAPTURE_ERROR":
@@ -55,7 +56,8 @@ function showResult(
   markdown: string,
   title: string,
   route: RouteDecision,
-  regions: number
+  regions: number,
+  tokens: TokenStats
 ) {
   statusEl.classList.add("hidden");
   captureBtn.disabled = false;
@@ -64,6 +66,7 @@ function showResult(
   downloadLink.href = dataUrl;
 
   showRoute(route, regions);
+  showTokens(tokens);
 
   // Back the Markdown download with a Blob object URL rather than a giant
   // data: URL — more memory-efficient for long pages. Revoke the previous one.
@@ -93,6 +96,17 @@ function showRoute(route: RouteDecision, regions: number) {
   routeBadge.title = route.reason;
   routeBadge.dataset.path = route.path;
   routeBadge.classList.remove("hidden");
+}
+
+/** Shows the output token estimate and, when the clean stage trimmed anything,
+ *  how much was saved. Counts are estimates (~4 chars/token), hence the `≈`. */
+function showTokens(tokens: TokenStats) {
+  const after = tokens.after.toLocaleString();
+  tokenStats.textContent =
+    tokens.saved > 0
+      ? `≈ ${after} tokens · −${tokens.savedPct}% after cleaning`
+      : `≈ ${after} tokens`;
+  tokenStats.classList.remove("hidden");
 }
 
 /** Turns a page title into a safe, lowercase filename stem. */

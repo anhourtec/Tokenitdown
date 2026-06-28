@@ -1,6 +1,6 @@
 # Extension Testing Handoff
 
-**Last updated:** 2026-06-27 (after M3 — hybrid vision-assist: region crop + inline describe)
+**Last updated:** 2026-06-27 (after M4 — clean stage: boilerplate strip + token report)
 **Branch:** `extension`
 **Scope:** Testing the Chrome extension (`extension/`) — what was done, what works, what's still unverified, and exactly where to continue.
 
@@ -24,7 +24,9 @@ The Chrome MV3 extension lives entirely under `extension/`. It captures a full-p
 | `src/lib/regions.ts` | M3: `collectRegions(doc)` finds visual regions (canvas/svg/figure/img, size-filtered, deduped) with page rects + labels; `injectPlaceholders(clone, regions)` puts inline tokens at each region's spot; `spliceDescriptions(md, descs)` swaps tokens for descriptions |
 | `src/lib/crop.ts` | M3: pure `regionPixelRect()` (CSS→device px, clamped) + `cropRegions(screenshotPng, regions, metrics)` — crops each region out of the stitched PNG via `OffscreenCanvas` |
 | `src/lib/describe.ts` | M3: `RegionDescriber` provider interface + default `metadataDescriber` (caption/alt/dimensions, no model) + `describeRegions()` helper. A vision/LLM provider plugs in here |
-| `src/types.ts` | Shared message type definitions (pure TypeScript interfaces, no Chrome API usage) — incl. `PageSignals`, `RouteDecision`, `PageAnalysis`, `Region`, `RegionCrop` |
+| `src/lib/clean.ts` | M4: `cleanMarkdown(md)` — high-precision boilerplate strip (cookie/social/newsletter/legal lines, nav link bars), consecutive-duplicate dedupe, blank-line collapse. Guards headings + blockquotes |
+| `src/lib/tokens.ts` | M4: `estimateTokens(text)` (~4 chars/token heuristic) + `tokenSavings(before, after)` → `TokenStats` |
+| `src/types.ts` | Shared message type definitions (pure TypeScript interfaces, no Chrome API usage) — incl. `PageSignals`, `RouteDecision`, `PageAnalysis`, `Region`, `RegionCrop`, `TokenStats` |
 | `src/types/turndown-plugin-gfm.d.ts` | Minimal type decl for `turndown-plugin-gfm` (ships no types) |
 
 ### Build & test
@@ -32,7 +34,7 @@ The Chrome MV3 extension lives entirely under `extension/`. It captures a full-p
 cd extension && npm run build     # rebuilds dist/ (copies public/ → dist/, incl. icons)
 cd extension && npm run typecheck # zero TS errors
 # unit tests run from the repo root via Vitest:
-npx vitest run extension/src/lib   # screenshot 7 + extract 6 + route 12 + regions 9 + crop 6 + describe 5 = 45 tests
+npx vitest run extension/src/lib   # screenshot 7 + extract 6 + route 12 + regions 9 + crop 6 + describe 5 + clean 6 + tokens 7 = 58 tests
 npm run e2e:extension              # 3 Playwright e2e tests (loads the unpacked extension)
 ```
 
@@ -48,11 +50,13 @@ npm run e2e:extension              # 3 Playwright e2e tests (loads the unpacked 
 | `extension/src/lib/extract.test.ts` — 6 unit tests (DOM→MD) | ✅ All pass |
 | `extension/src/lib/route.test.ts` — 12 unit tests (M2 router) | ✅ All pass |
 | `extension/src/lib/{regions,crop,describe}.test.ts` — 20 unit tests (M3) | ✅ All pass |
+| `extension/src/lib/{clean,tokens}.test.ts` — 13 unit tests (M4) | ✅ All pass |
 | `e2e/extension.spec.ts` — 3 Playwright e2e tests | ✅ All pass (1.7s) |
 | `playwright.extension.config.ts` + npm script | ✅ In place |
 | M1 DOM→Markdown — live-verified in real Chrome + security review | ✅ Clean |
 | M2 router — live-verified in real Chrome (3/3 routes) + security review | ✅ Clean |
 | M3 hybrid region crop + inline describe — live-verified + security review | ✅ Clean |
+| M4 clean stage + token report — popup UI live-verified + security review | ✅ Clean |
 
 ### Resolution of the "Chrome launch crash" (session 2026-06-27)
 
@@ -550,7 +554,60 @@ location is still an open decision (no LLM backend/key exists yet): Next.js
 (user key in storage), or local Ollama (llava). The crop pipeline already feeds
 `crop.dataUrl` to the describer, so only the provider body changes.
 
-**Not yet done / next milestones:**
-- **M4 — Clean stage.** Boilerplate strip + token compressor (the PLAN.md hero).
+### Milestone M4 — Clean Stage + Token Report ✅ DONE (2026-06-27)
+
+Strips residual boilerplate from the assembled Markdown and reports the token
+savings — the token-economics thesis feature (PLAN.md §4.3 #3).
+
+**Decision (this session):** built the deterministic clean core (high-precision
+heuristics, no model) + a token estimate. An aggressive LLM "AI prune" can layer
+on top later; the seam is the same `cleanMarkdown` call site in the service worker.
+
+**What was built:**
+- `lib/clean.ts` — `cleanMarkdown(md)`:
+  - Drops whole-line boilerplate via a curated regex list (cookie/consent banners,
+    social-share rows, newsletter CTAs, auth nav, copyright/legal footers,
+    `Advertisement`, skip-links) tested against the line with Markdown syntax
+    stripped. **Conservative by design** — it never touches headings (`#…`) or
+    blockquotes (`>…`, which hold M3 region descriptions), and a "nav bar" line must
+    contain ≥4 links to be removed (single reference links survive). Precision over
+    recall: leaving a little cruft beats deleting real content.
+  - Removes consecutive duplicate lines (repeated headers/footers/items) and
+    collapses the blank lines left behind. Returns `{ markdown, removedLines }`.
+- `lib/tokens.ts` — `estimateTokens(text)` (whitespace-collapsed `length/4`
+  heuristic; labelled `≈` everywhere since the true count is model-specific and
+  bundling a BPE tokenizer isn't worth the MBs) + `tokenSavings(before, after)`.
+- `service-worker.ts` — after M3 splice: `before = estimateTokens(described)`,
+  `cleanMarkdown(described)`, `tokens = tokenSavings(before, estimateTokens(cleaned))`;
+  the **cleaned** Markdown is what's downloaded, and `tokens` rides along in `CAPTURE_DONE`.
+- `popup.{ts,html,css}` — a token-stats line next to the route badge:
+  `≈ 770 tokens · −38% after cleaning` (or just `≈ N tokens` when nothing was
+  trimmed). Rendered via `textContent` with numeric values only.
+- `types.ts` — `CleanResult`, `TokenStats`; `CAPTURE_DONE.tokens`.
+
+**Verification:**
+- `npx vitest run extension/src/lib` — **58/58 pass** (M4 adds 13: clean 6 —
+  boilerplate strip, nav-bar vs single-link, heading/blockquote protection,
+  consecutive dedupe, no-false-positive on prose like "about cookies", blank-line
+  collapse; tokens 7 — estimate ~4 chars/token + whitespace-insensitivity +
+  monotonicity, savings math incl. growth-clamped and divide-by-zero).
+- **Popup UI live-verified in real Chrome** (the new browser surface): forced the
+  result panel into a hybrid `CAPTURE_DONE` state and asserted the route badge and
+  token-stats render on one row, correct text, no overflow at 300px width
+  (screenshot confirmed). The clean/token *logic* is pure and fully unit-tested;
+  the full screenshot→clean path still needs the `activeTab` toolbar gesture
+  Playwright can't supply, same constraint as M3.
+- `npm run build` + `typecheck` clean; `e2e/extension.spec.ts` still 3/3.
+- `/security-review` — **clean, no findings.** `cleanMarkdown`/`tokens` are pure
+  string/arithmetic (no DOM, no dynamic `RegExp` from page content); the cleaned
+  Markdown stays download-only; the popup stat is `textContent` of numbers.
+
+**Next milestones:**
+- **M4b (optional) — AI prune.** An LLM pass over the cleaned Markdown for deeper
+  boilerplate/redundancy removal, behind the same call site. Needs the same
+  provider decision as M3b.
+- **M5 — Screenshot quality (Strategy A, CDP).** Matters more now: crops feed M3.
+- Wire `page.md` + `screenshot.png` (+ a11y tree) into the authenticated bundle
+  upload (PLAN.md §4.4).
 - **M5 — Screenshot quality (Strategy A CDP).** Matters more now: crops feed M3.
 - Wire `page.md` + `screenshot.png` into the authenticated bundle upload (PLAN.md).

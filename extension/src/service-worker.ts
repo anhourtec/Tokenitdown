@@ -12,6 +12,8 @@ import { captureFrames } from "./lib/screenshot";
 import { cropRegions } from "./lib/crop";
 import { describeRegions, metadataDescriber } from "./lib/describe";
 import { spliceDescriptions } from "./lib/regions";
+import { cleanMarkdown } from "./lib/clean";
+import { estimateTokens, tokenSavings } from "./lib/tokens";
 
 // Delay between scroll and capture to let lazy-loaded content settle
 const SCROLL_SETTLE_MS = 150;
@@ -86,12 +88,17 @@ async function handleStartCapture() {
 
     // M3 — on hybrid pages, crop each visual region from the screenshot, describe
     // it, and splice the description into the Markdown where its placeholder sits.
-    const markdown = await describeRegionsInline(
+    const described = await describeRegionsInline(
       analysis.extract.markdown,
       analysis.regions,
       dataUrl,
       metrics
     );
+
+    // M4 — strip residual boilerplate and report the token savings.
+    const before = estimateTokens(described);
+    const { markdown } = cleanMarkdown(described);
+    const tokens = tokenSavings(before, estimateTokens(markdown));
 
     sendToPopup({
       type: "CAPTURE_DONE",
@@ -100,6 +107,7 @@ async function handleStartCapture() {
       title: analysis.extract.title,
       route: analysis.route,
       regions: analysis.regions.length,
+      tokens,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
