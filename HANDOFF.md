@@ -269,6 +269,29 @@ routes into cached 404s; `force-dynamic` on the dashboard layout fixes it locall
 (`next start` serves them 200) but the docker image still 404'd in testing — revisit
 before the next Docker deploy. Dev (`npm run dev`) is unaffected.
 
+## Security: dependency alerts (2026-06-28)
+
+Addressed Dependabot alerts. **Verified:** pytest 24 ✓, vitest 13 ✓, typecheck/lint/
+`next build` ✓.
+
+**Python (`server/requirements*.txt`) — fully fixed (these touch our own request handling):**
+- `python-multipart` 0.0.20 → **0.0.32** (Arbitrary File Write [High], unbounded
+  header DoS, quadratic querystring, large-preamble DoS, negative Content-Length,
+  RFC-2231 + semicolon param smuggling).
+- `requests` 2.32.3 → **2.34.2** (.netrc leak, insecure temp-file reuse).
+- `pytest` 8.3.4 → **8.4.2** (tmpdir handling).
+
+**npm:** `webpack` 5.99.9 → **5.108.1** (buildHttp allowedUris SSRF).
+
+**Not remediated (documented, low real risk):** the remaining npm advisories
+(`undici`, `esbuild`, `js-yaml`, `uuid`, `elliptic`, `postcss`, `@opentelemetry/core`)
+live in **transitive copies bundled inside dev/build tooling** (Storybook, Jest,
+drizzle-kit, nyc/istanbul). npm `overrides` can't replace bundled deps, and the only
+audit-offered fix is downgrading core packages (`next@9`, storybook 7, drizzle-kit
+0.18) — which would break the app. None ship in the production runtime (`next start`).
+`elliptic` has no fixed release; `@opentelemetry/core` needs the `@vercel/otel` v2
+migration (attempted — left otel core at v1, a boot-risk mismatch — reverted).
+
 ## What Worked
 - Grep-based scrubbing (`grep -rIn -i "blazity\|next-enterprise\|pnpm"`) to confirm no stray references remain — repeat this after future edits.
 - Converting `pnpm.overrides` → top-level npm `overrides` (npm uses a different key).
