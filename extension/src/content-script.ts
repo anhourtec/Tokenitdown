@@ -3,11 +3,30 @@ import { extractMarkdown } from "./lib/extract";
 import { collectSignals, decideRoute } from "./lib/route";
 import { collectRegions, injectPlaceholders } from "./lib/regions";
 
+// This script auto-injects via the manifest (`<all_urls>`) AND the service worker
+// re-injects it on capture (to cover tabs opened before the extension loaded).
+// Both land in the same isolated world sharing `window`, so register the message
+// listener only once — otherwise every request would be handled (and answered)
+// twice. Redefining the helper functions below on a second injection is harmless.
+declare global {
+  interface Window {
+    __tokenitdownContentLoaded?: boolean;
+  }
+}
+
 // Tracks elements we hid so we can restore them
 let hiddenElements: Array<{ el: HTMLElement; prevVisibility: string }> = [];
 
-chrome.runtime.onMessage.addListener(
-  (msg: WorkerToContentMessage, _sender, sendResponse) => {
+if (!window.__tokenitdownContentLoaded) {
+  window.__tokenitdownContentLoaded = true;
+  chrome.runtime.onMessage.addListener(handleMessage);
+}
+
+function handleMessage(
+  msg: WorkerToContentMessage,
+  _sender: chrome.runtime.MessageSender,
+  sendResponse: (response?: unknown) => void
+) {
     switch (msg.type) {
       case "GET_PAGE_METRICS":
         sendResponse(null); // ack — metrics come back via sendMessage
@@ -41,10 +60,9 @@ chrome.runtime.onMessage.addListener(
         // on this message channel directly via sendResponse.
         sendResponse(analyzePage());
         break;
-    }
-    return true; // keep message channel open for async sendResponse
   }
-);
+  return true; // keep message channel open for async sendResponse
+}
 
 /**
  * Extracts the page's Markdown, scores it against DOM signals, and routes it to

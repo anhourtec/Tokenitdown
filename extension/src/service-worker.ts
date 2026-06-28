@@ -52,9 +52,11 @@ async function handleStartCapture() {
   activeTabId = tab.id;
 
   try {
+    // The build emits the content script at dist/src/content-script.js, so the
+    // injected path must include the src/ prefix (matches manifest content_scripts).
     await chrome.scripting.executeScript({
       target: { tabId: tab.id },
-      files: ["content-script.js"],
+      files: ["src/content-script.js"],
     });
 
     // Get page dimensions

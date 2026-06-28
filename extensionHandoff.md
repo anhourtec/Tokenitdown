@@ -1,6 +1,7 @@
 # Extension Testing Handoff
 
-**Last updated:** 2026-06-27 (after M5 — CDP single-pass screenshot capture, primary path)
+**Last updated:** 2026-06-27 (after M5 + first manual button-click run: content-script
+path bug fixed; scroll-animated-site screenshot limitation documented)
 **Branch:** `extension`
 **Scope:** Testing the Chrome extension (`extension/`) — what was done, what works, what's still unverified, and exactly where to continue.
 
@@ -60,6 +61,8 @@ npm run e2e:extension              # 3 Playwright e2e tests (loads the unpacked 
 | M3 hybrid region crop + inline describe — live-verified + security review | ✅ Clean |
 | M4 clean stage + token report — popup UI live-verified + security review | ✅ Clean |
 | M5 CDP single-pass capture — live-verified in real Chrome + security review | ✅ Clean |
+| Content-script injection path bug (`src/content-script.js`) + double-inject guard | ✅ Fixed |
+| Scroll-animated sites repeat hero in screenshot (iotkinect) | ⚠️ Known limitation (not a code bug) |
 
 ### Resolution of the "Chrome launch crash" (session 2026-06-27)
 
@@ -665,3 +668,62 @@ This is Strategy A from the capture-quality plan above.
 **Then — bundle upload.** Wire `page.md` + `screenshot.png` (+ a11y tree) into the
 authenticated platform upload (PLAN.md §4.4). And the optional **M3b/M4b** LLM
 providers (vision describe / AI prune), both gated on the same provider decision.
+
+---
+
+## Manual-Testing Findings (session 2026-06-27, first real button-click run)
+
+The first hands-on capture (clicking the toolbar button on real pages) surfaced
+two things the automated tests had missed — the full button→download flow had
+never run end-to-end before because Playwright can't click the toolbar icon and
+`activeTab`-gated `captureVisibleTab`/`executeScript` need that gesture.
+
+### Bug — content-script injection path (FIXED)
+
+**Symptom:** clicking *Capture Full Page* → `Error: Could not load file: 'content-script.js'`.
+
+**Cause:** `service-worker.ts` injected `files: ["content-script.js"]`, but the build
+emits it at `dist/src/content-script.js`. Chrome couldn't resolve the path. This bug
+had been present **since the first commit** — it never surfaced because the full
+capture flow was never run end-to-end (the `activeTab` limitation blocked e2e).
+
+**Fix:**
+- Corrected the path to `src/content-script.js` (matches `manifest.content_scripts`
+  and the dist layout).
+- Added a **double-injection guard** in `content-script.ts` (`window.__tokenitdownContentLoaded`):
+  the script now both auto-injects (manifest `<all_urls>`) *and* gets re-injected on
+  capture (to cover tabs opened before the extension loaded). Both land in the same
+  isolated world, so the message listener must register only once — otherwise every
+  request is handled (and answered) twice. Helper functions redefining on the second
+  injection are harmless; only the `addListener` is guarded.
+- Verified: typecheck + build + 63 unit + 3 e2e all still green.
+
+### Limitation — scroll-animated / pinned sites repeat the hero (NOT a bug)
+
+**Symptom:** on `iotkinect.com` the full-page screenshot repeats the hero ~14×
+down a 12,916px-tall image.
+
+**Investigated and ruled out a capture-method bug** (reproduced in real Chrome):
+- A controlled page with a `position: fixed` header captures **correctly** — header
+  once at top, all content below. So `captureBeyondViewport` does **not** generically
+  tile/duplicate fixed elements.
+- Capturing `iotkinect.com` with `Emulation.setDeviceMetricsOverride` (viewport =
+  full page height) **still repeats** the hero → the override is no help, so it was
+  **not shipped**.
+
+**Root cause:** these sites (GSAP ScrollTrigger / pinned-scroll / `fullPage.js` —
+note iotkinect's *"scroll to explore"*) build the page as a tall stack of panels that
+are revealed/animated **one at a time as you scroll**. The single-screen view only
+exists *mid-scroll*; a full-page screenshot renders the **static, unscrolled** layout
+where all panels are stacked → the hero appears repeated. Every full-page screenshot
+tool (GoFullPage, Awesome Screenshot) hits this — there is no single "full page" to
+capture. **The Markdown is unaffected** (the router picks DOM), so `iotkinect.md` is
+clean; only the screenshot is distorted.
+
+**My M5 verification missed this** because it asserted output *dimensions* only, not
+visual content. Lesson: screenshot verification must check content, not just size.
+
+**Possible future work (not done):** detect scroll-driven/pinned pages (e.g. very tall
+`scrollHeight` with little extractable text, or known animation libs on the page) and
+prefer the scroll-and-stitch path (which advances the scroll animations frame by frame
+and tends to look better on these sites) — or warn the user. Tie this into Strategy B.
