@@ -7,10 +7,10 @@ import * as React from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { ExplorerSkeleton } from "@/components/ui/page-skeletons"
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
 
 interface DocSummary {
@@ -51,6 +51,12 @@ export function RagClient() {
   React.useEffect(() => {
     ;(async () => {
       try {
+        // Seed the granularity from the user's saved default before loading docs.
+        const prefRes = await fetch("/api/settings")
+        if (prefRes.ok) {
+          const pref = (await prefRes.json()) as { defaultChunkLevel?: string }
+          if (pref.defaultChunkLevel) setLevel(pref.defaultChunkLevel)
+        }
         const res = await fetch("/api/documents")
         const body = (await res.json()) as { documents?: DocSummary[]; error?: string }
         if (!res.ok) throw new Error(body?.error ?? "Failed to load documents")
@@ -137,7 +143,7 @@ export function RagClient() {
     setTimeout(() => setCopied(false), 1500)
   }
 
-  if (docs === null) return <Skeleton className="min-h-0 w-full flex-1" />
+  if (docs === null) return <ExplorerSkeleton leftSearch />
 
   if (docs.length === 0) {
     return (

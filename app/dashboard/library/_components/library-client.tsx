@@ -10,8 +10,8 @@ import { Card, CardContent } from "@/components/ui/card"
 import { CleanInsightsButton } from "@/components/ui/clean-insights"
 import ComponentFileViewer, { type ApiComponent } from "@/components/ui/file-viewer"
 import { Input } from "@/components/ui/input"
+import { ExplorerSkeleton } from "@/components/ui/page-skeletons"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Skeleton } from "@/components/ui/skeleton"
 
 import type { CleanStats } from "@/lib/markdown/clean"
 
@@ -149,7 +149,7 @@ export function LibraryClient() {
   }
 
   if (docs === null) {
-    return <Skeleton className="min-h-0 w-full flex-1" />
+    return <ExplorerSkeleton topbar />
   }
 
   if (docs.length === 0) {

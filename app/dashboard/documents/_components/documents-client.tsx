@@ -11,10 +11,10 @@ import { FileCard, type FormatFileProps } from "@/components/ui/file-card"
 import { ShikiViewer } from "@/components/ui/file-viewer"
 import { Input } from "@/components/ui/input"
 import { Markdown } from "@/components/ui/markdown"
+import { ExplorerSkeleton } from "@/components/ui/page-skeletons"
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Skeleton } from "@/components/ui/skeleton"
 import type { CleanStats } from "@/lib/markdown/clean"
 import { cn } from "@/lib/utils"
 
@@ -105,15 +105,20 @@ export function DocumentsClient() {
   const [activeId, setActiveId] = React.useState<string | undefined>(undefined)
   const [query, setQuery] = React.useState("")
   const [typeFilter, setTypeFilter] = React.useState<DocType>("all")
+  const [showOriginals, setShowOriginals] = React.useState<boolean | null>(null)
 
   React.useEffect(() => {
     let mounted = true
     ;(async () => {
       try {
-        const res = await fetch("/api/documents")
+        const [res, prefRes] = await Promise.all([fetch("/api/documents"), fetch("/api/settings")])
         const body = (await res.json()) as { documents?: DocSummary[]; error?: string }
         if (!res.ok) throw new Error(body?.error ?? "Failed to load documents")
-        if (mounted) setDocs((body.documents ?? []).filter((d) => d.sourceType === "file"))
+        const pref = prefRes.ok ? ((await prefRes.json()) as { storeOriginals?: boolean }) : { storeOriginals: true }
+        if (mounted) {
+          setShowOriginals(pref.storeOriginals !== false)
+          setDocs((body.documents ?? []).filter((d) => d.sourceType === "file"))
+        }
       } catch (err) {
         if (mounted) {
           setError((err as Error).message)
@@ -143,7 +148,27 @@ export function DocumentsClient() {
     setActiveId(undefined)
   }, [])
 
-  if (docs === null) return <Skeleton className="min-h-0 w-full flex-1" />
+  if (docs === null || showOriginals === null) return <ExplorerSkeleton leftSearch />
+
+  if (showOriginals === false) {
+    return (
+      <Card>
+        <CardContent className="flex flex-col items-center gap-2 py-16 text-center">
+          <div className="flex size-11 items-center justify-center rounded-full border bg-muted text-muted-foreground">
+            <FolderOpen className="size-5" />
+          </div>
+          <p className="font-medium text-sm">Original files are hidden</p>
+          <p className="max-w-sm text-muted-foreground text-sm">
+            Your originals are still safely stored on the server. Turn on{" "}
+            <Link className="text-primary underline" href="/dashboard/settings">
+              Show original files
+            </Link>{" "}
+            in Settings to preview and download them here.
+          </p>
+        </CardContent>
+      </Card>
+    )
+  }
 
   if (docs.length === 0) {
     return (
@@ -248,6 +273,19 @@ function Preview({ doc, onDelete }: { doc: DocSummary; onDelete: (id: string) =>
   const [copied, setCopied] = React.useState(false)
   const [confirmDelete, setConfirmDelete] = React.useState(false)
   const [deleting, setDeleting] = React.useState(false)
+  // null = checking, true/false = whether the stored original exists.
+  const [available, setAvailable] = React.useState<boolean | null>(null)
+
+  React.useEffect(() => {
+    let mounted = true
+    setAvailable(null)
+    fetch(fileUrl, { method: "HEAD" })
+      .then((r) => mounted && setAvailable(r.ok))
+      .catch(() => mounted && setAvailable(false))
+    return () => {
+      mounted = false
+    }
+  }, [fileUrl])
 
   React.useEffect(() => {
     if (tab !== "markdown" || markdown !== null) return
@@ -361,11 +399,13 @@ function Preview({ doc, onDelete }: { doc: DocSummary; onDelete: (id: string) =>
             </>
           )}
 
-          <a href={fileUrl} download={doc.sourceName}>
-            <Button variant="ghost" size="icon" className="size-8" title="Download original">
-              <Download className="size-3.5" />
-            </Button>
-          </a>
+          {available !== false && (
+            <a href={fileUrl} download={doc.sourceName}>
+              <Button variant="ghost" size="icon" className="size-8" title="Download original">
+                <Download className="size-3.5" />
+              </Button>
+            </a>
+          )}
 
           {confirmDelete ? (
             <Button variant="destructive" size="sm" disabled={deleting} onClick={() => void del()}>
@@ -389,8 +429,32 @@ function Preview({ doc, onDelete }: { doc: DocSummary; onDelete: (id: string) =>
 
       <div className="min-h-0 flex-1 overflow-auto bg-muted/30">
         {tab === "original" ? (
-          <>
-            {kind === "pdf" && <iframe src={fileUrl} title={doc.sourceName} className="h-full w-full border-0" />}
+          available === null ? (
+            <div className="flex h-full items-center justify-center text-muted-foreground">
+              <Loader2 className="size-5 animate-spin" />
+            </div>
+          ) : available === false ? (
+            <div className="grid h-full place-items-center p-6">
+              <div className="flex max-w-sm flex-col items-center gap-4 text-center">
+                <div className="flex size-12 items-center justify-center rounded-full border bg-muted text-muted-foreground">
+                  <FileText className="size-5" />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <p className="font-medium text-sm">Original not available</p>
+                  <p className="text-muted-foreground text-sm">
+                    The original file isn&apos;t stored for this document — it was either converted with{" "}
+                    <strong>Store original files</strong> turned off, or it has been removed. The converted Markdown is
+                    still here.
+                  </p>
+                </div>
+                <Button size="sm" onClick={() => setTab("markdown")}>
+                  View Markdown
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <>
+              {kind === "pdf" && <iframe src={fileUrl} title={doc.sourceName} className="h-full w-full border-0" />}
             {kind === "image" && (
               <div className="flex h-full items-center justify-center p-4">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -422,7 +486,8 @@ function Preview({ doc, onDelete }: { doc: DocSummary; onDelete: (id: string) =>
                 </div>
               </div>
             )}
-          </>
+            </>
+          )
         ) : mdError ? (
           <p className="p-5 text-destructive text-sm">{mdError}</p>
         ) : markdown === null ? (
