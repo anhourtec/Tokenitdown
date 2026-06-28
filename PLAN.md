@@ -3,7 +3,7 @@
 **Company:** AnHourTec
 **Working names:** `TokenItDown` (token/agent theme) · `Markpipe` (clean/descriptive) — *final name TBD; Readymark held as backup*
 **Status:** Planning / pre-build
-**Last updated:** 2026-06-24
+**Last updated:** 2026-06-28
 
 > **Note:** The current repository is scaffolded on **Next.js 15 / React 19**. This plan proposes Nuxt 3 / Vue 3 for the dashboard — confirm the final framework direction before building product UI. See `HANDOFF.md`.
 
@@ -64,9 +64,16 @@ A routed pipeline rather than a single converter, so most documents take the fas
 - **Fast path** — PyMuPDF4LLM / MarkItDown for native digital PDFs and Office files (no GPU, sub-second).
 - **Structure path** — Docling for table-heavy, multi-column, and academic layouts (CPU-capable, best table fidelity).
 - **High-fidelity path** — Marker for math/equations and messy scans (GPU-accelerated; note Marker's >$2M-revenue commercial license).
+- **High-accuracy AI-OCR path** — a vision-LLM / dedicated OCR engine for **handwriting**, degraded scans, and multi-language docs (where MarkItDown OCR is weak). Pluggable (cloud or local); selected by routing or a user "high-accuracy" toggle. See `plans/clean-process-outputs-and-competitive-coverage.md` §4.1.
 - **Auto-routing** — heuristics (tables detected? headings/body ratio? scanned?) decide the path; user can override and force an engine.
 - **Supported inputs** — PDF, DOCX, PPTX, XLSX, images (OCR), HTML, CSV/JSON/XML, EPUB, audio (transcription), ZIP (iterate contents), YouTube URLs.
 - **Outputs** — Markdown (default), JSON, HTML, chunked.
+- **Clean & process pass** — every conversion runs a deterministic
+  normalization step after the engine (heading promotion, table/list repair,
+  reading-order + boilerplate strip, de-hyphenation, Unicode NFC, base64-image
+  extraction, whitespace collapse) plus opt-in AI passes (**formulas → LaTeX**,
+  figure alt-text, table rebuild). This is the fidelity + token-economy core;
+  see `plans/clean-process-outputs-and-competitive-coverage.md` §3.
 
 ### 4.2 Dashboard — all MarkItDown features, made user-friendly
 
@@ -108,6 +115,8 @@ These are the parts competitors haven't packaged well — the launch should lead
 
 8. **Summaries & mind maps** — table-stakes (competitors have them); include as supporting, not headline.
 
+9. **Auto tag & categorize** — after cleaning, an AI pass proposes tags + a category (user-editable) to power a self-organizing library. Skipped in ephemeral mode. See `plans/clean-process-outputs-and-competitive-coverage.md` §4.4.
+
 ### 4.4 Chrome Extension — web → platform capture
 
 More than "page to Markdown." Each capture produces an agent-consumable **context bundle**:
@@ -123,7 +132,9 @@ Bundles land directly in the user's library, pushed to the platform via authenti
 
 - **Bundled MCP server** — Claude consumes MCP natively; ChatGPT supports MCP via connectors/Apps. One MCP server satisfies both — no separate integrations.
   - Tools exposed: list documents, fetch Markdown by id, search library, fetch context bundle.
-- **REST API** — programmatic convert + fetch for pipelines and the extension.
+- **REST API** — programmatic convert + fetch for pipelines and the extension; Bearer API keys (hashed, per-user, revocable). `POST /api/v1/convert`.
+- **CLI tool** — `npm i -g tokenitdown`, then `tokenitdown convert <file>` (or `npx`); guided setup stores the API key. A developer/agent/CI wedge over the REST API. See `plans/clean-process-outputs-and-competitive-coverage.md` §4.5.
+- **Anonymous try-it demo** — convert without signup (page 1 only, ≤5 MB, ephemeral, strict rate limit) to sell the token-savings value top-of-funnel. See §4.7 of the same plan.
 - **Self-hosted instances expose their own MCP endpoint** — agents read local Markdown without the source files ever leaving the box.
 - **Token-cost benefit** — agents pull pre-converted Markdown instead of re-parsing raw files every call.
 
@@ -144,6 +155,8 @@ Bundles land directly in the user's library, pushed to the platform via authenti
 - Versioning — keep original + re-convert with a different engine + diff outputs.
 - Watch-folder / source connectors — auto-convert on arrival (NAS share, Drive, S3) and push results out (Notion, GitHub, vector DB) via webhook.
 - Bulk operations (re-convert, re-chunk, export).
+- **Export targets** — format-perfect, no-cleanup output to **Obsidian** (`[[WikiLinks]]` + `#tags` + YAML front-matter), **Notion** (blocks via API), and **GitHub** (GFM). Front-matter toggle (with/without) since it costs tokens when fed to an LLM. See `plans/clean-process-outputs-and-competitive-coverage.md` §4.8.
+- **Ephemeral "don't store" mode** — per-conversion + account-default toggle that returns output without persisting originals/Markdown (privacy/self-host parity with "documents never stored"). See §4.9.
 
 ---
 

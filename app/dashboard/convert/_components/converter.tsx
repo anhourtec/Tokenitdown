@@ -6,9 +6,11 @@ import * as React from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { CleanInsights } from "@/components/ui/clean-insights"
 import { FileCard } from "@/components/ui/file-card"
 import { Input } from "@/components/ui/input"
 import { Markdown } from "@/components/ui/markdown"
+import type { CleanStats } from "@/lib/markdown/clean"
 import { cn } from "@/lib/utils"
 
 import { ScanAnimation } from "./scan-animation"
@@ -20,6 +22,14 @@ type ConverterFormat = Omit<ConvertFormat, "icon">
 
 type JobStatus = "converting" | "done" | "error"
 
+interface TokenSavings {
+  rawTokens: number
+  cleanTokens: number
+  saved: number
+  pct: number
+  exact: boolean
+}
+
 interface Job {
   id: string
   name: string
@@ -27,6 +37,17 @@ interface Job {
   status: JobStatus
   markdown?: string
   docId?: string
+  tokens?: TokenSavings
+  cleanStats?: CleanStats
+  error?: string
+}
+
+type ConvertResponse = {
+  markdown?: string
+  title?: string | null
+  id?: string
+  tokens?: TokenSavings
+  cleanStats?: CleanStats
   error?: string
 }
 
@@ -62,9 +83,16 @@ export function Converter({ format, maxUploadBytes }: { format: ConverterFormat;
         const form = new FormData()
         form.append("file", file)
         const res = await fetch("/api/convert", { method: "POST", body: form })
-        const body = (await res.json()) as { markdown?: string; title?: string | null; id?: string; error?: string }
+        const body = (await res.json()) as ConvertResponse
         if (!res.ok) throw new Error(body?.error ?? `Conversion failed (${res.status})`)
-        update(id, { status: "done", markdown: body.markdown, docId: body.id, name: body.title || file.name })
+        update(id, {
+          status: "done",
+          markdown: body.markdown,
+          docId: body.id,
+          tokens: body.tokens,
+          cleanStats: body.cleanStats,
+          name: body.title || file.name,
+        })
       } catch (err) {
         update(id, { status: "error", error: (err as Error).message })
       }
@@ -92,9 +120,16 @@ export function Converter({ format, maxUploadBytes }: { format: ConverterFormat;
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url: trimmed }),
       })
-      const body = (await res.json()) as { markdown?: string; title?: string | null; id?: string; error?: string }
+      const body = (await res.json()) as ConvertResponse
       if (!res.ok) throw new Error(body?.error ?? `Conversion failed (${res.status})`)
-      update(id, { status: "done", markdown: body.markdown, docId: body.id, name: body.title || trimmed })
+      update(id, {
+        status: "done",
+        markdown: body.markdown,
+        docId: body.id,
+        tokens: body.tokens,
+        cleanStats: body.cleanStats,
+        name: body.title || trimmed,
+      })
       setUrl("")
     } catch (err) {
       update(id, { status: "error", error: (err as Error).message })
@@ -263,8 +298,18 @@ function ResultCard({ job, onDismiss }: { job: Job; onDismiss: () => void }) {
         {job.status === "converting" && <ScanAnimation />}
         {job.status === "error" && <p className="text-destructive text-sm">{job.error}</p>}
         {job.status === "done" && (
-          <div className="max-h-[32rem] overflow-auto rounded-lg border bg-background p-5">
-            <Markdown content={job.markdown ?? ""} />
+          <div className="flex flex-col gap-4">
+            {job.tokens && (
+              <CleanInsights
+                rawTokens={job.tokens.rawTokens}
+                cleanTokens={job.tokens.cleanTokens}
+                cleanTier="clean"
+                stats={job.cleanStats}
+              />
+            )}
+            <div className="max-h-[32rem] overflow-auto rounded-lg border bg-background p-5">
+              <Markdown content={job.markdown ?? ""} />
+            </div>
           </div>
         )}
       </CardContent>

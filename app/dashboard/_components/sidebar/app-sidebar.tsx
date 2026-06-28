@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 
-import { Logo } from "@/components/ui/logo"
+import { BrandMark } from "@/components/ui/brand-mark"
 import {
   Sidebar,
   SidebarContent,
@@ -32,7 +32,7 @@ export function AppSidebar({ user, ...props }: React.ComponentProps<typeof Sideb
           <SidebarMenuItem>
             <SidebarMenuButton asChild className="data-[slot=sidebar-menu-button]:!p-1.5">
               <Link prefetch={false} href="/dashboard">
-                <Logo className="!size-5 text-primary" aria-hidden />
+                <BrandMark className="!h-8 w-auto shrink-0 group-data-[collapsible=icon]:!size-7" />
                 <span className="text-base font-semibold">TokenItDown</span>
               </Link>
             </SidebarMenuButton>

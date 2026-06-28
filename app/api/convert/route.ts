@@ -2,7 +2,10 @@ import { headers } from "next/headers"
 
 import { auth } from "@/lib/auth"
 import { saveDocument } from "@/lib/documents"
+import { cleanMarkdown } from "@/lib/markdown/clean"
+import { tokenSavings } from "@/lib/markdown/tokens"
 import { ConversionError, convertFile } from "@/lib/markitdown-client"
+import { getPreferences } from "@/lib/preferences"
 
 import { env } from "../../../env.mjs"
 
@@ -38,9 +41,15 @@ export async function POST(req: Request) {
   }
 
   const bytes = Buffer.from(await file.arrayBuffer())
+  const prefs = await getPreferences(session.user.id)
+  // Explicit ?tier wins (API callers); otherwise use the user's saved default.
+  const formTier = form.get("tier")
+  const tier = formTier === "compact" ? "compact" : formTier === "clean" ? "clean" : prefs.defaultCleanTier
 
   try {
-    const { markdown, title } = await convertFile(bytes, file.name, file.type)
+    const { markdown: raw, title } = await convertFile(bytes, file.name, file.type)
+    const { markdown, stats } = cleanMarkdown(raw, tier)
+    const tokens = tokenSavings(raw, markdown)
     const doc = await saveDocument({
       userId: session.user.id,
       title,
@@ -48,9 +57,16 @@ export async function POST(req: Request) {
       sourceName: file.name || "upload",
       mimetype: file.type || null,
       markdown,
+      markdownRaw: raw,
+      cleanTier: tier,
+      rawTokens: tokens.rawTokens,
+      cleanTokens: tokens.cleanTokens,
+      cleanStats: stats,
+      // Always persist the original; `storeOriginals` only controls whether it's
+      // shown on the dashboard (see the Documents page).
       original: { bytes, filename: file.name || "upload" },
     })
-    return Response.json({ id: doc.id, title: doc.title, markdown })
+    return Response.json({ id: doc.id, title: doc.title, markdown, tokens, cleanStats: stats })
   } catch (err) {
     if (err instanceof ConversionError) {
       return Response.json({ error: err.message }, { status: err.status })

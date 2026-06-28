@@ -19,6 +19,7 @@ import io
 import os
 from urllib.parse import urlparse
 
+import requests
 from fastapi import Depends, FastAPI, File, Header, HTTPException, UploadFile
 from markitdown import MarkItDown, StreamInfo
 from pydantic import BaseModel
@@ -93,7 +94,11 @@ async def convert(file: UploadFile = File(...)) -> ConvertResponse:
     try:
         result = _md.convert_stream(io.BytesIO(data), stream_info=stream_info)
     except Exception as exc:  # noqa: BLE001 — surface any converter failure as 422
-        raise HTTPException(status_code=422, detail=f"Conversion failed: {exc}") from exc
+        print(f"[convert] conversion failed for {filename!r}: {exc!r}")
+        raise HTTPException(
+            status_code=422,
+            detail="This file could not be converted — it may be corrupted, password-protected, or an unsupported format.",
+        ) from exc
 
     return ConvertResponse(markdown=result.markdown, title=result.title)
 
@@ -119,9 +124,26 @@ def convert_url(req: UrlRequest) -> ConvertResponse:
                 result = _md.convert_response(resp)
     except UnsafeURLError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except requests.exceptions.HTTPError as exc:
+        code = exc.response.status_code if exc.response is not None else None
+        detail = (
+            f"The page returned HTTP {code} — it may require a login/subscription or block automated access."
+            if code
+            else "The page could not be fetched."
+        )
+        raise HTTPException(status_code=422, detail=detail) from exc
+    except requests.exceptions.RequestException as exc:
+        # Connection reset/timeout/DNS — typically anti-bot protection, a paywall,
+        # or a transient network issue. Keep the message generic (don't leak internals).
+        print(f"[convert-url] fetch failed for {url!r}: {exc!r}")
+        raise HTTPException(
+            status_code=422,
+            detail="The site refused or dropped the connection. It likely blocks automated access, requires a subscription, or is temporarily unavailable.",
+        ) from exc
     except HTTPException:
         raise
     except Exception as exc:  # noqa: BLE001
-        raise HTTPException(status_code=422, detail=f"Conversion failed: {exc}") from exc
+        print(f"[convert-url] conversion failed for {url!r}: {exc!r}")
+        raise HTTPException(status_code=422, detail="This page could not be converted to Markdown.") from exc
 
     return ConvertResponse(markdown=result.markdown, title=result.title)

@@ -5,6 +5,7 @@ import { mkdir, readFile, rm, writeFile } from "node:fs/promises"
 import path from "node:path"
 
 import { db, schema } from "./db"
+import type { CleanStats } from "./markdown/clean"
 import { buildStoragePath, resolveStoredFile, safeExtension } from "./storage-path"
 
 import { env } from "../env.mjs"
@@ -21,6 +22,11 @@ export interface DocumentRecord {
   sizeBytes: number
   storagePath: string | null
   markdown: string
+  markdownRaw: string | null
+  cleanTier: string
+  rawTokens: number
+  cleanTokens: number
+  cleanStats: CleanStats | null
   createdAt: Date
 }
 
@@ -36,6 +42,12 @@ interface SaveDocumentInput {
   sourceName: string
   mimetype?: string | null
   markdown: string
+  /** Raw engine output before cleaning (kept for re-processing). */
+  markdownRaw?: string | null
+  cleanTier?: string
+  rawTokens?: number
+  cleanTokens?: number
+  cleanStats?: CleanStats | null
   /** Original bytes to persist on disk (uploads only). */
   original?: { bytes: Buffer; filename: string } | null
 }
@@ -72,6 +84,11 @@ export async function saveDocument(input: SaveDocumentInput): Promise<DocumentRe
       sizeBytes,
       storagePath,
       markdown: input.markdown,
+      markdownRaw: input.markdownRaw ?? null,
+      cleanTier: input.cleanTier ?? "clean",
+      rawTokens: input.rawTokens ?? 0,
+      cleanTokens: input.cleanTokens ?? 0,
+      cleanStats: input.cleanStats ?? null,
     })
     .returning()
 
@@ -88,6 +105,8 @@ export async function listDocuments(userId: string) {
       sourceName: schema.document.sourceName,
       mimetype: schema.document.mimetype,
       sizeBytes: schema.document.sizeBytes,
+      rawTokens: schema.document.rawTokens,
+      cleanTokens: schema.document.cleanTokens,
       createdAt: schema.document.createdAt,
     })
     .from(schema.document)

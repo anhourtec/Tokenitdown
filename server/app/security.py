@@ -26,7 +26,19 @@ import requests
 
 DEFAULT_TIMEOUT = 30
 MAX_REDIRECTS = 5
-USER_AGENT = "TokenItDown/1.0 (+https://github.com/anhourtec/tokenitdown)"
+
+# Present as a normal browser. Many sites reject the default python-requests /
+# bot user-agents outright (connection reset, 403). This doesn't defeat sites
+# that fingerprint TLS or require JS/login (e.g. major paywalled news), but it
+# fixes the large class of sites that only filter on User-Agent.
+BROWSER_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
+    ),
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9",
+}
 
 
 class UnsafeURLError(ValueError):
@@ -88,7 +100,7 @@ def safe_get(url: str, *, timeout: int = DEFAULT_TIMEOUT) -> requests.Response:
             timeout=timeout,
             allow_redirects=False,
             stream=True,
-            headers={"User-Agent": USER_AGENT},
+            headers=BROWSER_HEADERS,
         )
         if resp.is_redirect or resp.is_permanent_redirect:
             location = resp.headers.get("Location")

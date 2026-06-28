@@ -5,7 +5,6 @@ import {
   Gauge,
   LayoutDashboard,
   type LucideIcon,
-  Minimize2,
   Plug,
   Settings,
   Upload,
@@ -86,9 +85,8 @@ export const sidebarItems: NavGroup[] = [
     id: 2,
     label: "AI",
     items: [
-      { id: "rag", title: "RAG Export", url: "#", icon: Boxes, badge: "new" },
-      { id: "compressor", title: "Token Compressor", url: "#", icon: Minimize2, badge: "new" },
-      { id: "analytics", title: "Analytics", url: "#", icon: Gauge },
+      { id: "rag", title: "RAG Export", url: "/dashboard/rag", icon: Boxes },
+      { id: "analytics", title: "Analytics", url: "/dashboard/analytics", icon: Gauge },
     ],
   },
   {
@@ -96,7 +94,7 @@ export const sidebarItems: NavGroup[] = [
     label: "Settings",
     items: [
       { id: "integrations", title: "Integrations", url: "#", icon: Plug, badge: "soon", disabled: true },
-      { id: "settings", title: "Settings", url: "#", icon: Settings },
+      { id: "settings", title: "Settings", url: "/dashboard/settings", icon: Settings },
     ],
   },
 ]

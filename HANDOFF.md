@@ -309,6 +309,133 @@ drizzle-kit 0.18), which would break the app. **None ship in the production runt
 stack, drizzle-kit) and migrate to `@vercel/otel` v2 + OpenTelemetry v2 in dedicated
 PRs; re-run `npm audit` after each.
 
+## Phase 2 — Clean & process outputs, insights, RAG export, analytics (2026-06-28)
+
+The "Clean and Process the Outputs" thesis (PLAN §4.1–4.3) is now real, plus the
+RAG-export and analytics surfaces. Full plan: `plans/clean-process-outputs-and-competitive-coverage.md`.
+
+**Markdown processing (`lib/markdown/`, pure + unit-tested):**
+- `clean.ts` — deterministic normalizer run after MarkItDown, before persistence.
+  Tiers: `raw` | `clean` (default, lossless) | `compact` (lossy: strips link URLs).
+  Fixes: heading promotion, table/list tidy, de-hyphenation, Unicode NFC + ligatures,
+  zero-width/**control-char** stripping (keeps NUL placeholder for masked code, `\t`, `\n`),
+  HTML-comment + base64-image removal, repeated header/footer + page-number removal,
+  whitespace collapse. `web: true` option also strips nav/footer link-runs + cookie/menu
+  chrome (used for URL sources). Idempotent; fenced code is masked so transforms never touch it.
+- `tokens.ts` — real GPT BPE token counts via **`gpt-tokenizer`** (server-side only; never
+  shipped to the browser). Heuristic fallback. `tokenSavings(raw, clean)` → {rawTokens,
+  cleanTokens, saved, pct}. NOTE: frontend never says "GPT/OpenAI" — just "tokens".
+- `chunk.ts` — `chunkByHeadings` (H1..maxLevel, code-fence aware) + `chunksToJsonl` +
+  `detectChunkLevel` (auto-picks 1/2/3 by chunk size vs a ~500-token target).
+
+**Persistence (Drizzle, migrations 0002 + 0003):** `document` gained `markdownRaw`
+(re-processable), `cleanTier`, `rawTokens`, `cleanTokens`, `cleanStats` (jsonb).
+`lib/documents.ts` saves/returns them; `listDocuments` includes token counts.
+
+**Convert routes:** `/api/convert` + `/api/convert/url` now clean engine output, compute
+token savings, persist raw+clean+stats, accept a `tier` (clean|compact), and the URL route
+passes `web:true`. Response returns `tokens` + `cleanStats`. New `GET /api/documents/[id]/chunks`
+(auth-gated; `level=auto|1|2|3`) for RAG. `/api/documents/[id]` now returns tokens/tier/stats.
+
+**UI — cleaning insights (`components/ui/clean-insights.tsx` + `popover.tsx`):**
+- `CleanInsights` panel (token-savings progress bar + "what we eliminated" breakdown +
+  tier badge) shown full on Convert results; `CleanInsightsButton` (compact `−%` popover)
+  in the Library/Documents viewer toolbars.
+- Convert page has a **Clean / Compact** tier toggle.
+
+**Library + Documents:** added **search + filters** (Library: source = all/file/url;
+Documents: type = pdf/image/office/data/other) and a no-match state. Library supports a
+`?doc=<id>` **deep-link** (moves that doc to the front so the viewer auto-selects it).
+
+**RAG Export (`/dashboard/rag`):** redesigned as a two-pane **explorer** — left = searchable
+document list, right = chunk viewer (granularity Auto/H1/H1+H2/H1–H3, Copy/Download JSONL,
+chunk filter, per-chunk copy + click-to-expand).
+
+**Analytics (`/dashboard/analytics`):** built from the `next-shadcn-admin-dashboard` patterns —
+a connected KPI strip, a **"Tokens saved over time"** chart that mirrors the home "Customer
+Activity" `ComposedChart` (functional period filter), a **"Top documents by savings"** card
+(Realtime-Visitors layout: headline + mini bar strip + top-4 grid), and a per-document table
+whose rows link to the doc in Library.
+
+**Sidebar (`navigation/sidebar/sidebar-items.ts`, `nav-main.tsx`):** removed **Token
+Compressor** (folded into the Compact tier + insights); **RAG Export** → `/dashboard/rag`,
+**Analytics** → `/dashboard/analytics` (real routes). "Quick Create" → **"New conversion"**
+linking to `/dashboard/convert` (dead Inbox button removed).
+
+**Login animation (`app/(auth)/login-overlay.tsx`):** branded full-screen loading sequence
+(logo → TokenItDown/AnHourTec → avatar + welcome → % counter + progress bar + staged
+checklist) shown after a successful sign-in/up, then redirects. Bar uses a single CSS
+transition over the full duration (React per-frame width made it jump).
+
+**Python service (`server/`):** fetch now sends a **browser User-Agent** + Accept headers
+(fixes UA-only-filtering sites) and maps connection/timeout/HTTP errors to **clean, generic
+messages** (no raw traceback leaked — closes the audit's info-leak finding). NOTE:
+hard-protected/paywalled sites (Washington Post, NYT, Cloudflare challenges) still fail —
+they fingerprint TLS / require JS+login; converting them needs a future **headless-browser
+fetch path**. Rebuild the `markitdown` image to pick up these changes.
+
+**Deps:** added `gpt-tokenizer`. **Tests:** 49 vitest passing (clean/tokens/chunk +
+existing); typecheck + lint clean. Engine for local testing: build & run only the markitdown
+container — see `memory/dev-test-harness.md`. Playwright MCP installed at user scope.
+
+**Not yet done / known gaps:** exact Claude `count_tokens` (currently GPT BPE); headless
+fetch for protected sites; per-chunk virtualization for thousand-chunk docs; server-side
+search/pagination when libraries get large; Docker prerender-404 (still open — analytics/rag
+use `headers()`/force-dynamic so fine in dev). **Not yet exercised via full Playwright e2e**
+(verified via API + typecheck/lint/unit instead; the browser extension wasn't connected).
+
+## Phase 3 — Settings, account, skeletons, branding (2026-06-28)
+
+**Per-user preferences (`user_preference` table, migration 0004):** `lib/preferences.ts`
+(`getPreferences` with defaults, validated `updatePreferences` upsert) + `/api/settings`
+(GET/PUT, auth-gated). Fields: `defaultCleanTier` (clean|compact), `defaultChunkLevel`
+(auto|1|2|3), `storeOriginals`.
+
+**Settings page (`/dashboard/settings`):** cards for Conversion (default cleaning level +
+"show original files"), RAG export (default chunk granularity), Appearance (theme via
+next-themes), Account (read-only). Each conversion/RAG option shows a **live example**
+(before/after for cleaning; sample chunk split for granularity). Convert routes now default
+`tier` to the saved pref (explicit `?tier` still overrides); the RAG page seeds its
+granularity from the pref. Sidebar **Settings** → `/dashboard/settings`.
+
+**Storage semantics (important):** the original upload is now **always** persisted
+server-side. `storeOriginals` only controls whether originals are **shown** on the
+Documents page (off → Documents shows a "hidden, still on server" card). Convert route no
+longer skips writing the file.
+
+**Account page (`/dashboard/account`):** name (`updateUser`), email (`changeEmail` —
+enabled in `lib/auth.ts`; with no verification sender, an unverified email updates
+directly), password (`changePassword`), and **avatar** upload. Avatar API
+`app/api/account/avatar` (POST stores to `STORAGE_DIR/avatars/<userId>`, type/size
+validated; GET serves with magic-sniffed Content-Type + nosniff); image saved via
+`updateUser({ image: "/api/account/avatar?v=<ts>" })`. `auth-client` now exports
+`updateUser/changeEmail/changePassword`. "Account" links wired in the sidebar user menu and
+header avatar menu (were dead).
+
+**Library / Documents / RAG:** search + filters on each (Library: source all/file/url +
+`?doc=<id>` deep-link that auto-selects; Documents: type filter + the visibility gate +
+graceful **"Original not available"** card via a HEAD probe instead of raw `{"error":...}`).
+**RAG redesigned** as a two-pane explorer (searchable doc list ↔ chunk viewer with
+granularity, Copy/Download JSONL, chunk filter, per-chunk copy/expand).
+
+**Loading skeletons (CLAUDE.md rule #10):** `components/ui/page-skeletons.tsx` exports
+page-shaped skeletons (`ExplorerSkeleton` topbar/leftSearch variants, `DashboardSkeleton`,
+`AnalyticsSkeleton`, `SettingsSkeleton`, `AccountSkeleton`, `ConvertSkeleton`,
+`PageHeaderSkeleton`). Per-route `loading.tsx` for dashboard/analytics/settings/convert/
+library/documents/rag/account; the three client list pages render the explorer skeleton
+while fetching. **Never reuse one generic skeleton** — match the page's layout.
+
+**Branding & favicons:** `public/` holds `token_it_down_logo.png` + the favicon set +
+`anhourtec_logo_{lightbg,darkbg}.svg`. `app/layout.tsx` wires title/description/manifest/
+icons (NOT the 1.7 MB `favicon.svg` — optimize it first if you want it). `components/ui/
+brand-mark.tsx` renders the PNG via `next/image` (`unoptimized` — the optimizer softened the
+detailed illustration) for the sidebar and login overlay. **Login/register use the raw PNG
+via a plain `<img>`** (no optimization, per request). The login loading overlay shows the
+**user's avatar** (initials fallback) and the **theme-aware AnHourTec wordmark**.
+
+**Auth pages:** theme toggle (light/dark/system) added to `/login` and `/register` (shared
+`(auth)/layout.tsx`, reuses the header `ThemeSwitcher`).
+
 ## What Worked
 - Grep-based scrubbing (`grep -rIn -i "blazity\|next-enterprise\|pnpm"`) to confirm no stray references remain — repeat this after future edits.
 - Converting `pnpm.overrides` → top-level npm `overrides` (npm uses a different key).

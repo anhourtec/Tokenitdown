@@ -75,7 +75,7 @@ export function HeaderActions({ user }: { user: HeaderUser }) {
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
           <DropdownMenuGroup>
-            <DropdownMenuItem>
+            <DropdownMenuItem onClick={() => router.push("/dashboard/account")}>
               <CircleUser />
               Account
             </DropdownMenuItem>
