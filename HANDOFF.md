@@ -168,6 +168,60 @@ Ported the **sidebar design + home ("default") dashboard** from
 - **Not committed** — pending user testing. `lp-items.tsx`, `components/Button`,
   `components/SignOutButton` are now unused (left in place); remove later if desired.
 
+## Phase 1 — Conversion engine + Convert/Library (2026-06-27)
+
+Wired up the **MarkItDown** processing engine end-to-end so any authenticated user
+can convert files/URLs to Markdown from the dashboard (PLAN.md §4.1–4.2).
+
+**Python processing service (`server/`):**
+- FastAPI wrapper around `markitdown[all]` (PyPI, pinned `0.1.6`). Endpoints:
+  `GET /health`, `POST /convert` (multipart upload → `convert_stream`),
+  `POST /convert-url` (JSON `{url}` → YouTube via `convert_uri`, other pages via a
+  guarded fetch + `convert_response`).
+- **Internal only** — no published port in compose; gated by a shared secret
+  (`X-Service-Token` vs `MARKITDOWN_SERVICE_TOKEN`, constant-time compare).
+- **SSRF guard** (`server/app/security.py`): rejects non-http(s) and any host that
+  resolves to private / loopback / link-local (incl. 169.254.169.254) / multicast
+  / reserved IPs; re-validates every redirect hop. 50 MB upload cap.
+- `server/Dockerfile` (`python:3.13-slim` + ffmpeg + exiftool), `requirements.txt`,
+  pytest suite (`tests/`, 24 tests passing). The full upstream repo is cloned to
+  `server/vendor/markitdown` for **reference only** (gitignored; we install from PyPI).
+- Local run: `cd server && python3.12 -m venv .venv && pip install -r
+  requirements-dev.txt && MARKITDOWN_SERVICE_TOKEN=… uvicorn app.main:app --port 8000`.
+
+**Compose + env:**
+- New `markitdown` service in `docker-compose.yml` (internal, healthcheck); `web`
+  gains `MARKITDOWN_SERVICE_URL=http://markitdown:8000`, `STORAGE_DIR=/data/uploads`,
+  an `uploads_data` volume, and `depends_on: markitdown (healthy)`.
+- `env.mjs`: `MARKITDOWN_SERVICE_URL` (default localhost:8000), **`MARKITDOWN_SERVICE_TOKEN`
+  (required, min 16)**, `STORAGE_DIR` (default `./data/uploads`), `MAX_UPLOAD_BYTES`
+  (default 50 MB). `.env.example` documents them. **Server `.env` must set
+  `MARKITDOWN_SERVICE_TOKEN`** before `./deploy.sh` (compose `:?` guard).
+
+**Persistence (Drizzle):**
+- New `document` table (`lib/db/schema.ts`) — per-user converted docs (markdown +
+  metadata; original stored on disk under `STORAGE_DIR/<userId>/<id><ext>`).
+  Migration `0001_chief_black_bolt.sql` (auto-runs on web startup / dev).
+- `lib/documents.ts` (save/list/get/delete) + pure path helpers in
+  `lib/storage-path.ts` (sanitized extension, traversal-proof resolve;
+  unit-tested in `lib/storage-path.test.ts`).
+
+**API routes (auth-gated, Node runtime):** `app/api/convert`, `app/api/convert/url`,
+`app/api/documents` (GET list), `app/api/documents/[id]` (GET/DELETE). `lib/markitdown-client.ts`
+forwards to the service and maps service 4xx → client.
+
+**UI:** `app/dashboard/convert` (drag-drop batch upload + URL field + per-file
+status + result viewer with Copy / Download .md) and `app/dashboard/library`
+(table of saved docs, view in a Sheet, download, inline-confirm delete). Sidebar
+`convert` → `/dashboard/convert`, `library` → `/dashboard/library`.
+
+**Verified:** pytest 24 ✓, vitest 13 ✓, typecheck ✓, lint ✓, `next build` ✓
+(routes present), `docker compose config` ✓. Service smoke-tested via curl
+(health, 401 without token, CSV→Markdown table, SSRF 400 on 169.254.169.254).
+**Not yet run:** the full Playwright browser e2e (needs the full stack up) — run it
+against `http://192.168.69.16:<WEB_PORT>` after `./deploy.sh`, or locally with a DB.
+**Pending user testing / not committed at time of writing this note.**
+
 ## What Worked
 - Grep-based scrubbing (`grep -rIn -i "blazity\|next-enterprise\|pnpm"`) to confirm no stray references remain — repeat this after future edits.
 - Converting `pnpm.overrides` → top-level npm `overrides` (npm uses a different key).
