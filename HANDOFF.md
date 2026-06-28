@@ -384,6 +384,58 @@ search/pagination when libraries get large; Docker prerender-404 (still open —
 use `headers()`/force-dynamic so fine in dev). **Not yet exercised via full Playwright e2e**
 (verified via API + typecheck/lint/unit instead; the browser extension wasn't connected).
 
+## Phase 3 — Settings, account, skeletons, branding (2026-06-28)
+
+**Per-user preferences (`user_preference` table, migration 0004):** `lib/preferences.ts`
+(`getPreferences` with defaults, validated `updatePreferences` upsert) + `/api/settings`
+(GET/PUT, auth-gated). Fields: `defaultCleanTier` (clean|compact), `defaultChunkLevel`
+(auto|1|2|3), `storeOriginals`.
+
+**Settings page (`/dashboard/settings`):** cards for Conversion (default cleaning level +
+"show original files"), RAG export (default chunk granularity), Appearance (theme via
+next-themes), Account (read-only). Each conversion/RAG option shows a **live example**
+(before/after for cleaning; sample chunk split for granularity). Convert routes now default
+`tier` to the saved pref (explicit `?tier` still overrides); the RAG page seeds its
+granularity from the pref. Sidebar **Settings** → `/dashboard/settings`.
+
+**Storage semantics (important):** the original upload is now **always** persisted
+server-side. `storeOriginals` only controls whether originals are **shown** on the
+Documents page (off → Documents shows a "hidden, still on server" card). Convert route no
+longer skips writing the file.
+
+**Account page (`/dashboard/account`):** name (`updateUser`), email (`changeEmail` —
+enabled in `lib/auth.ts`; with no verification sender, an unverified email updates
+directly), password (`changePassword`), and **avatar** upload. Avatar API
+`app/api/account/avatar` (POST stores to `STORAGE_DIR/avatars/<userId>`, type/size
+validated; GET serves with magic-sniffed Content-Type + nosniff); image saved via
+`updateUser({ image: "/api/account/avatar?v=<ts>" })`. `auth-client` now exports
+`updateUser/changeEmail/changePassword`. "Account" links wired in the sidebar user menu and
+header avatar menu (were dead).
+
+**Library / Documents / RAG:** search + filters on each (Library: source all/file/url +
+`?doc=<id>` deep-link that auto-selects; Documents: type filter + the visibility gate +
+graceful **"Original not available"** card via a HEAD probe instead of raw `{"error":...}`).
+**RAG redesigned** as a two-pane explorer (searchable doc list ↔ chunk viewer with
+granularity, Copy/Download JSONL, chunk filter, per-chunk copy/expand).
+
+**Loading skeletons (CLAUDE.md rule #10):** `components/ui/page-skeletons.tsx` exports
+page-shaped skeletons (`ExplorerSkeleton` topbar/leftSearch variants, `DashboardSkeleton`,
+`AnalyticsSkeleton`, `SettingsSkeleton`, `AccountSkeleton`, `ConvertSkeleton`,
+`PageHeaderSkeleton`). Per-route `loading.tsx` for dashboard/analytics/settings/convert/
+library/documents/rag/account; the three client list pages render the explorer skeleton
+while fetching. **Never reuse one generic skeleton** — match the page's layout.
+
+**Branding & favicons:** `public/` holds `token_it_down_logo.png` + the favicon set +
+`anhourtec_logo_{lightbg,darkbg}.svg`. `app/layout.tsx` wires title/description/manifest/
+icons (NOT the 1.7 MB `favicon.svg` — optimize it first if you want it). `components/ui/
+brand-mark.tsx` renders the PNG via `next/image` (`unoptimized` — the optimizer softened the
+detailed illustration) for the sidebar and login overlay. **Login/register use the raw PNG
+via a plain `<img>`** (no optimization, per request). The login loading overlay shows the
+**user's avatar** (initials fallback) and the **theme-aware AnHourTec wordmark**.
+
+**Auth pages:** theme toggle (light/dark/system) added to `/login` and `/register` (shared
+`(auth)/layout.tsx`, reuses the header `ThemeSwitcher`).
+
 ## What Worked
 - Grep-based scrubbing (`grep -rIn -i "blazity\|next-enterprise\|pnpm"`) to confirm no stray references remain — repeat this after future edits.
 - Converting `pnpm.overrides` → top-level npm `overrides` (npm uses a different key).
