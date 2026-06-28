@@ -11,6 +11,8 @@ import {
   Upload,
 } from "lucide-react"
 
+import { CONVERT_FORMATS } from "@/app/dashboard/convert/formats"
+
 export type NavBadge = "new" | "soon"
 
 export interface NavSubItem {
@@ -30,6 +32,8 @@ interface NavItemBase {
   badge?: NavBadge
   disabled?: boolean
   newTab?: boolean
+  /** For parent items: expand the submenu by default. */
+  defaultOpen?: boolean
 }
 
 export interface NavMainLinkItem extends NavItemBase {
@@ -59,9 +63,23 @@ export const sidebarItems: NavGroup[] = [
     label: "Workspace",
     items: [
       { id: "dashboard", title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
-      { id: "convert", title: "Convert", url: "/dashboard/convert", icon: Upload },
+      {
+        id: "convert",
+        title: "Convert",
+        icon: Upload,
+        defaultOpen: true,
+        subItems: [
+          { id: "convert-all", title: "All formats", url: "/dashboard/convert" },
+          ...CONVERT_FORMATS.map((f) => ({
+            id: `convert-${f.slug}`,
+            title: f.navLabel,
+            url: `/dashboard/convert/${f.slug}`,
+            icon: f.icon,
+          })),
+        ],
+      },
       { id: "library", title: "Library", url: "/dashboard/library", icon: FolderOpen },
-      { id: "documents", title: "Documents", url: "#", icon: FileText },
+      { id: "documents", title: "Documents", url: "/dashboard/documents", icon: FileText },
     ],
   },
   {

@@ -168,7 +168,7 @@ function NavItem({ item, isItemActive, isSubItemActive, isSubmenuOpen }: NavItem
     <NavCollapsibleItem
       item={item}
       isActive={isItemActive(item)}
-      defaultOpen={isSubmenuOpen(item)}
+      defaultOpen={isSubmenuOpen(item) || Boolean(item.defaultOpen)}
       isSubItemActive={isSubItemActive}
     />
   );

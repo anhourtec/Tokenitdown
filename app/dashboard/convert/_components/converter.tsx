@@ -1,13 +1,22 @@
 "use client"
 
-import { Check, Copy, Download, FileText, Link2, Loader2, Upload, X } from "lucide-react"
+import { Check, Copy, Download, FileText, Link2, Upload, X } from "lucide-react"
 import * as React from "react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { FileCard } from "@/components/ui/file-card"
 import { Input } from "@/components/ui/input"
+import { Markdown } from "@/components/ui/markdown"
 import { cn } from "@/lib/utils"
+
+import { ScanAnimation } from "./scan-animation"
+
+import type { ConvertFormat } from "../formats"
+
+/** Serializable subset of ConvertFormat (no icon component) safe to pass to this client component. */
+type ConverterFormat = Omit<ConvertFormat, "icon">
 
 type JobStatus = "converting" | "done" | "error"
 
@@ -21,19 +30,13 @@ interface Job {
   error?: string
 }
 
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-}
-
 let counter = 0
 function nextId(): string {
   counter += 1
   return `job-${counter}-${Date.now()}`
 }
 
-export function ConvertClient({ maxUploadBytes }: { maxUploadBytes: number }) {
+export function Converter({ format, maxUploadBytes }: { format: ConverterFormat; maxUploadBytes: number }) {
   const [jobs, setJobs] = React.useState<Job[]>([])
   const [url, setUrl] = React.useState("")
   const [urlBusy, setUrlBusy] = React.useState(false)
@@ -49,7 +52,7 @@ export function ConvertClient({ maxUploadBytes }: { maxUploadBytes: number }) {
       const id = nextId()
       if (file.size > maxUploadBytes) {
         setJobs((prev) => [
-          { id, name: file.name, kind: "file", status: "error", error: `Exceeds the ${formatBytes(maxUploadBytes)} limit.` },
+          { id, name: file.name, kind: "file", status: "error", error: "This file is too large to convert." },
           ...prev,
         ])
         return
@@ -102,14 +105,13 @@ export function ConvertClient({ maxUploadBytes }: { maxUploadBytes: number }) {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        {/* Drop zone */}
-        <Card className="lg:col-span-2">
+      {format.mode === "file" ? (
+        <Card>
           <CardContent className="pt-6">
             <div
               role="button"
               tabIndex={0}
-              aria-label="Upload files to convert"
+              aria-label={`Upload files to convert (${format.title})`}
               onClick={() => inputRef.current?.click()}
               onKeyDown={(e) => {
                 if (e.key === "Enter" || e.key === " ") inputRef.current?.click()
@@ -125,22 +127,37 @@ export function ConvertClient({ maxUploadBytes }: { maxUploadBytes: number }) {
                 handleFiles(e.dataTransfer.files)
               }}
               className={cn(
-                "flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed px-6 py-12 text-center transition-colors",
-                dragging ? "border-primary bg-primary/5" : "border-muted-foreground/25 hover:border-primary/50"
+                "group flex cursor-pointer flex-col items-center justify-center gap-4 rounded-xl border-2 border-dashed px-6 py-16 text-center transition-colors",
+                dragging
+                  ? "border-primary bg-primary/5"
+                  : "border-muted-foreground/25 bg-gradient-to-b from-muted/30 to-transparent hover:border-primary/50 hover:bg-primary/[0.03]"
               )}
             >
-              <div className="flex size-11 items-center justify-center rounded-full border bg-muted text-muted-foreground">
-                <Upload className="size-5" />
+              <div className="flex items-end justify-center gap-3 transition-transform group-hover:-translate-y-0.5">
+                {format.cards.map((c, i) => (
+                  <div
+                    key={`${c}-${i}`}
+                    className="transition-transform"
+                    style={{ transform: `rotate(${(i - (format.cards.length - 1) / 2) * 8}deg)` }}
+                  >
+                    <FileCard formatFile={c} />
+                  </div>
+                ))}
               </div>
-              <p className="font-medium text-sm">Drop files here, or click to browse</p>
-              <p className="text-muted-foreground text-xs">
-                PDF · DOCX · PPTX · XLSX · images · audio · HTML · CSV/JSON/XML · ZIP · EPUB · up to{" "}
-                {formatBytes(maxUploadBytes)}
-              </p>
+              <div className="flex flex-col items-center gap-1">
+                <p className="flex items-center gap-2 font-medium text-sm">
+                  <Upload className="size-4 text-primary" />
+                  Drop {format.navLabel.replace("Md ", "")} files here, or click to browse
+                </p>
+                {format.extensions && (
+                  <p className="text-muted-foreground text-xs">{format.extensions.join(" · ")}</p>
+                )}
+              </div>
               <input
                 ref={inputRef}
                 type="file"
                 multiple
+                accept={format.accept}
                 className="hidden"
                 onChange={(e) => {
                   handleFiles(e.target.files)
@@ -150,15 +167,14 @@ export function ConvertClient({ maxUploadBytes }: { maxUploadBytes: number }) {
             </div>
           </CardContent>
         </Card>
-
-        {/* URL */}
+      ) : (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
-              <Link2 className="size-4" /> From a URL
+              <Link2 className="size-4" /> Paste a URL
             </CardTitle>
           </CardHeader>
-          <CardContent className="flex flex-col gap-3">
+          <CardContent className="flex flex-col gap-3 sm:flex-row">
             <Input
               type="url"
               inputMode="url"
@@ -169,16 +185,14 @@ export function ConvertClient({ maxUploadBytes }: { maxUploadBytes: number }) {
                 if (e.key === "Enter") void convertUrl()
               }}
             />
-            <Button onClick={() => void convertUrl()} disabled={!url.trim() || urlBusy}>
-              {urlBusy ? <Loader2 className="size-4 animate-spin" /> : <Link2 className="size-4" />}
+            <Button onClick={() => void convertUrl()} disabled={!url.trim() || urlBusy} className="shrink-0">
+              <Link2 className="size-4" />
               Convert URL
             </Button>
-            <p className="text-muted-foreground text-xs">Web pages and YouTube videos (transcript).</p>
           </CardContent>
         </Card>
-      </div>
+      )}
 
-      {/* Results */}
       {jobs.length > 0 && (
         <div className="flex flex-col gap-4">
           <h3 className="font-medium text-sm text-muted-foreground">Results</h3>
@@ -222,11 +236,6 @@ function ResultCard({ job, onDismiss }: { job: Job; onDismiss: () => void }) {
         <CardTitle className="min-w-0 flex-1 truncate text-base" title={job.name}>
           {job.name}
         </CardTitle>
-        {job.status === "converting" && (
-          <Badge variant="secondary">
-            <Loader2 className="size-3 animate-spin" /> Converting
-          </Badge>
-        )}
         {job.status === "done" && (
           <Badge>
             <Check className="size-3" /> Done
@@ -250,17 +259,15 @@ function ResultCard({ job, onDismiss }: { job: Job; onDismiss: () => void }) {
           </Button>
         </div>
       </CardHeader>
-      {(job.status === "done" || job.status === "error") && (
-        <CardContent>
-          {job.status === "error" ? (
-            <p className="text-destructive text-sm">{job.error}</p>
-          ) : (
-            <pre className="max-h-96 overflow-auto rounded-md border bg-muted/40 p-4 text-xs leading-relaxed whitespace-pre-wrap break-words">
-              {job.markdown}
-            </pre>
-          )}
-        </CardContent>
-      )}
+      <CardContent>
+        {job.status === "converting" && <ScanAnimation />}
+        {job.status === "error" && <p className="text-destructive text-sm">{job.error}</p>}
+        {job.status === "done" && (
+          <div className="max-h-[32rem] overflow-auto rounded-lg border bg-background p-5">
+            <Markdown content={job.markdown ?? ""} />
+          </div>
+        )}
+      </CardContent>
     </Card>
   )
 }
