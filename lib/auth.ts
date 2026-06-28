@@ -30,6 +30,11 @@ export const auth = betterAuth({
     autoSignIn: true,
     minPasswordLength: 8,
   },
+  user: {
+    // Allow changing email from the account page. With no verification sender
+    // configured, an unverified current email is updated directly.
+    changeEmail: { enabled: true },
+  },
   session: {
     // 7-day sessions, refreshed once a day while active.
     expiresIn: 60 * 60 * 24 * 7,
