@@ -283,14 +283,31 @@ Addressed Dependabot alerts. **Verified:** pytest 24 ✓, vitest 13 ✓, typeche
 
 **npm:** `webpack` 5.99.9 → **5.108.1** (buildHttp allowedUris SSRF).
 
-**Not remediated (documented, low real risk):** the remaining npm advisories
-(`undici`, `esbuild`, `js-yaml`, `uuid`, `elliptic`, `postcss`, `@opentelemetry/core`)
-live in **transitive copies bundled inside dev/build tooling** (Storybook, Jest,
-drizzle-kit, nyc/istanbul). npm `overrides` can't replace bundled deps, and the only
-audit-offered fix is downgrading core packages (`next@9`, storybook 7, drizzle-kit
-0.18) — which would break the app. None ship in the production runtime (`next start`).
-`elliptic` has no fixed release; `@opentelemetry/core` needs the `@vercel/otel` v2
-migration (attempted — left otel core at v1, a boot-risk mismatch — reverted).
+### Completed
+- python-multipart, requests, pytest (above) — covers Dependabot **#13–#23** (all
+  Python alerts) + the `requests` ones.
+- webpack 5.108.1 — covers **#3, #4** (webpack buildHttp SSRF).
+
+### Left (not safely fixable now — all npm, all transitive dev/build tooling)
+These are **bundled copies inside dev tooling** (Storybook, Jest, drizzle-kit,
+nyc/istanbul). npm `overrides` can't replace *bundled* deps, and the only fix the
+audit offers is **downgrading core packages** (`next@9.3.3`, storybook 7,
+drizzle-kit 0.18), which would break the app. **None ship in the production runtime**
+— the web container runs `next start`, not these tools.
+
+| Alert | Package | Note / path forward |
+|------|---------|---------------------|
+| #9–#12 | `undici` (1 High) | bundled in dev tooling; `overrides` ineffective. Resolves when the bundling parent (Storybook/Jest) is upgraded. |
+| #1 | `esbuild` (Mod) | bundled in `drizzle-kit`/storybook; upgrade those to clear. |
+| #7 | `js-yaml` (Mod) | old 3.x copy in a dev tool; forcing 4.x breaks its `safeLoad` API. |
+| #6 | `uuid` (Mod) | v8/v9 bundled in istanbul/jest-junit; bumping to v11+ breaks them. |
+| #5 | `postcss` (Mod) | a nested 8.4.31 copy; a global override collides with an ancient 4.x consumer. |
+| #8 | `@opentelemetry/core` (Mod) | runtime telemetry; needs the `@vercel/otel` v2 / otel v2 migration (attempted → left otel core at v1, a boot-risk mismatch → reverted). Do as a focused upgrade. |
+| #2 | `elliptic` (Low) | **no fixed release** (latest 6.6.1 still in the advisory range) — wait for upstream. |
+
+**Recommended follow-up:** upgrade the dev-tooling parents (Storybook 8/9, the Jest
+stack, drizzle-kit) and migrate to `@vercel/otel` v2 + OpenTelemetry v2 in dedicated
+PRs; re-run `npm audit` after each.
 
 ## What Worked
 - Grep-based scrubbing (`grep -rIn -i "blazity\|next-enterprise\|pnpm"`) to confirm no stray references remain — repeat this after future edits.
