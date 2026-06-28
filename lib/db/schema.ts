@@ -97,4 +97,22 @@ export const document = pgTable(
   (table) => [index("document_userId_idx").on(table.userId)]
 )
 
-export const schema = { user, session, account, verification, document }
+/**
+ * Per-user preferences (1:1 with user). Defaults applied in lib/preferences.ts
+ * when no row exists yet.
+ */
+export const userPreference = pgTable("user_preference", {
+  userId: text("userId")
+    .primaryKey()
+    .references(() => user.id, { onDelete: "cascade" }),
+  // Default cleaning tier for conversions: "clean" | "compact".
+  defaultCleanTier: text("defaultCleanTier").notNull().default("clean"),
+  // Default RAG chunk granularity: "auto" | "1" | "2" | "3".
+  defaultChunkLevel: text("defaultChunkLevel").notNull().default("auto"),
+  // Whether to keep the original uploaded file on disk after conversion.
+  storeOriginals: boolean("storeOriginals").notNull().default(true),
+  createdAt: timestamp("createdAt").notNull().defaultNow(),
+  updatedAt: timestamp("updatedAt").notNull().defaultNow(),
+})
+
+export const schema = { user, session, account, verification, document, userPreference }
