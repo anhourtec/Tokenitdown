@@ -24,6 +24,10 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     sizeBytes: doc.sizeBytes,
     createdAt: doc.createdAt,
     markdown: doc.markdown,
+    cleanTier: doc.cleanTier,
+    rawTokens: doc.rawTokens,
+    cleanTokens: doc.cleanTokens,
+    cleanStats: doc.cleanStats,
   })
 }
 

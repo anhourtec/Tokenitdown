@@ -2,6 +2,8 @@ import { headers } from "next/headers"
 
 import { auth } from "@/lib/auth"
 import { saveDocument } from "@/lib/documents"
+import { cleanMarkdown } from "@/lib/markdown/clean"
+import { tokenSavings } from "@/lib/markdown/tokens"
 import { ConversionError, convertFile } from "@/lib/markitdown-client"
 
 import { env } from "../../../env.mjs"
@@ -38,9 +40,12 @@ export async function POST(req: Request) {
   }
 
   const bytes = Buffer.from(await file.arrayBuffer())
+  const tier = form.get("tier") === "compact" ? "compact" : "clean"
 
   try {
-    const { markdown, title } = await convertFile(bytes, file.name, file.type)
+    const { markdown: raw, title } = await convertFile(bytes, file.name, file.type)
+    const { markdown, stats } = cleanMarkdown(raw, tier)
+    const tokens = tokenSavings(raw, markdown)
     const doc = await saveDocument({
       userId: session.user.id,
       title,
@@ -48,9 +53,14 @@ export async function POST(req: Request) {
       sourceName: file.name || "upload",
       mimetype: file.type || null,
       markdown,
+      markdownRaw: raw,
+      cleanTier: tier,
+      rawTokens: tokens.rawTokens,
+      cleanTokens: tokens.cleanTokens,
+      cleanStats: stats,
       original: { bytes, filename: file.name || "upload" },
     })
-    return Response.json({ id: doc.id, title: doc.title, markdown })
+    return Response.json({ id: doc.id, title: doc.title, markdown, tokens, cleanStats: stats })
   } catch (err) {
     if (err instanceof ConversionError) {
       return Response.json({ error: err.message }, { status: err.status })
