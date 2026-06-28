@@ -4,6 +4,10 @@
   "version": "0.1.0",
   "description": "Capture any web page as a full-page screenshot.",
   "permissions": ["activeTab", "scripting", "storage", "debugger"],
+  "host_permissions": [
+    "http://localhost:3000/*",
+    "https://tokenitdown.anhourtec.com/*"
+  ],
   "action": {
     "default_popup": "src/popup/popup.html",
     "default_title": "Capture with TokenItDown",
