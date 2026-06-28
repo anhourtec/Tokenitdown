@@ -1,7 +1,7 @@
 import { desc, eq } from "drizzle-orm"
 
 import { randomUUID } from "node:crypto"
-import { mkdir, rm, writeFile } from "node:fs/promises"
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises"
 import path from "node:path"
 
 import { db, schema } from "./db"
@@ -101,6 +101,21 @@ export async function getDocument(id: string, userId: string): Promise<DocumentR
   const doc = rows[0] as DocumentRecord | undefined
   if (!doc || doc.userId !== userId) return null
   return doc
+}
+
+/** Read the stored original file for a document (scoped to owner). Null if none/missing. */
+export async function getDocumentFile(
+  id: string,
+  userId: string
+): Promise<{ bytes: Buffer; mimetype: string | null; filename: string } | null> {
+  const doc = await getDocument(id, userId)
+  if (!doc || !doc.storagePath) return null
+  try {
+    const bytes = await readFile(storedFile(doc.storagePath))
+    return { bytes, mimetype: doc.mimetype, filename: doc.sourceName }
+  } catch {
+    return null
+  }
 }
 
 /** Delete a document (row + stored original) scoped to its owner. Returns true if removed. */
