@@ -11,7 +11,6 @@ import { Card, CardContent } from "../../components/ui/card"
 import { Checkbox } from "../../components/ui/checkbox"
 import { Input } from "../../components/ui/input"
 import { Label } from "../../components/ui/label"
-import { Logo } from "../../components/ui/logo"
 import { PasswordInput } from "../../components/ui/password-input"
 import { signIn, signUp } from "../../lib/auth-client"
 
@@ -32,7 +31,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
   const [confirmPassword, setConfirmPassword] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
-  const [success, setSuccess] = useState<{ name: string; email: string } | null>(null)
+  const [success, setSuccess] = useState<{ name: string; email: string; image: string | null } | null>(null)
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -60,8 +59,12 @@ export function AuthForm({ mode }: { mode: Mode }) {
       return
     }
 
-    const signedInName = (result.data as { user?: { name?: string } } | null)?.user?.name
-    setSuccess({ name: isRegister ? name : (signedInName ?? ""), email })
+    const signedInUser = (result.data as { user?: { name?: string; image?: string | null } } | null)?.user
+    setSuccess({
+      name: isRegister ? name : (signedInUser?.name ?? ""),
+      email,
+      image: isRegister ? null : (signedInUser?.image ?? null),
+    })
   }
 
   if (success) {
@@ -69,6 +72,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
       <LoginOverlay
         name={success.name}
         email={success.email}
+        image={success.image}
         mode={mode}
         onComplete={() => {
           router.push("/dashboard")
@@ -81,7 +85,9 @@ export function AuthForm({ mode }: { mode: Mode }) {
   return (
     <div className="flex w-full flex-1 flex-col justify-center px-4 py-10 lg:px-6">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        <Logo className="text-foreground mx-auto h-10 w-10" aria-hidden={true} />
+        {/* Use the original PNG directly (no next/image optimization). */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/token_it_down_logo.png" alt="TokenItDown" className="mx-auto h-20 w-auto" />
         <h3 className="text-foreground mt-4 text-center text-lg font-bold">
           {isRegister ? "Create your TokenItDown account" : "Sign in to TokenItDown"}
         </h3>

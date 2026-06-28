@@ -3,7 +3,8 @@
 import { Check } from "lucide-react"
 import { useEffect, useState } from "react"
 
-import { Logo } from "../../components/ui/logo"
+import { Avatar, AvatarFallback, AvatarImage } from "../../components/ui/avatar"
+import { BrandMark } from "../../components/ui/brand-mark"
 import { cn } from "../../lib/utils"
 
 const STEPS_LOGIN = [
@@ -47,11 +48,13 @@ function RuleLabel({ children }: { children: React.ReactNode }) {
 export function LoginOverlay({
   name,
   email,
+  image,
   mode = "login",
   onComplete,
 }: {
   name: string
   email: string
+  image?: string | null
   mode?: "login" | "register"
   onComplete: () => void
 }) {
@@ -94,20 +97,29 @@ export function LoginOverlay({
       <div className="flex w-full max-w-md flex-col items-center gap-7 text-center">
         {/* Brand */}
         <div className="flex flex-col items-center gap-3">
-          <div className="grid size-16 place-items-center rounded-2xl border bg-card text-primary shadow-sm">
-            <Logo className="size-8" aria-hidden />
+          <div className="grid size-16 place-items-center rounded-2xl border bg-card shadow-sm">
+            <BrandMark className="size-11" />
           </div>
-          <div className="flex flex-col items-center gap-1.5">
+          <div className="flex flex-col items-center gap-2">
             <h1 className="font-bold text-3xl tracking-tight">TokenItDown</h1>
-            <RuleLabel>by AnHourTec</RuleLabel>
+            <div className="flex items-center gap-1.5 text-muted-foreground">
+              <span className="text-xs uppercase tracking-[0.18em]">by</span>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/anhourtec_logo_lightbg.svg" alt="AnHourTec" className="h-6 w-auto dark:hidden" />
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/anhourtec_logo_darkbg.svg" alt="AnHourTec" className="hidden h-6 w-auto dark:block" />
+            </div>
           </div>
         </div>
 
         {/* User */}
         <div className="flex flex-col items-center gap-2">
-          <div className="grid size-12 place-items-center rounded-full bg-primary font-semibold text-primary-foreground">
-            {initials(name, email)}
-          </div>
+          <Avatar className="size-12">
+            <AvatarImage src={image || undefined} alt={name} />
+            <AvatarFallback className="bg-primary font-semibold text-primary-foreground">
+              {initials(name, email)}
+            </AvatarFallback>
+          </Avatar>
           <div className="flex flex-col gap-0.5">
             <p className="font-semibold text-lg">
               {mode === "register" ? "Welcome" : "Welcome back"}
