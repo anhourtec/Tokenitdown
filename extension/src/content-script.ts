@@ -1,4 +1,5 @@
 import type { WorkerToContentMessage } from "./types";
+import { extractMarkdown } from "./lib/extract";
 
 // Tracks elements we hid so we can restore them
 let hiddenElements: Array<{ el: HTMLElement; prevVisibility: string }> = [];
@@ -31,6 +32,12 @@ chrome.runtime.onMessage.addListener(
       case "RESTORE_FIXED_ELEMENTS":
         restoreFixedElements();
         chrome.runtime.sendMessage({ type: "FIXED_RESTORED" });
+        break;
+
+      case "EXTRACT_MARKDOWN":
+        // Readability runs synchronously against the live DOM, so we can reply
+        // on this message channel directly via sendResponse.
+        sendResponse(extractMarkdown(document, location.href));
         break;
     }
     return true; // keep message channel open for async sendResponse

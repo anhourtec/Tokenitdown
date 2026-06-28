@@ -1,6 +1,7 @@
 import type {
   CapturedFrame,
   ContentToWorkerMessage,
+  ExtractResult,
   PageMetrics,
   PopupMessage,
   WorkerMessage,
@@ -53,6 +54,10 @@ async function handleStartCapture() {
     // Get page dimensions
     const metrics = await requestPageMetrics(tab.id);
 
+    // Extract Markdown from the live DOM before we start scrolling/hiding
+    // elements, so the conversion sees the page in its natural state.
+    const extracted = await requestMarkdown(tab.id);
+
     // Hide fixed elements so they don't repeat in every frame
     await sendToContent(tab.id, { type: "HIDE_FIXED_ELEMENTS" });
 
@@ -76,7 +81,12 @@ async function handleStartCapture() {
     // Stitch frames into a single PNG
     const dataUrl = await stitch(frames, metrics);
 
-    sendToPopup({ type: "CAPTURE_DONE", dataUrl });
+    sendToPopup({
+      type: "CAPTURE_DONE",
+      dataUrl,
+      markdown: extracted.markdown,
+      title: extracted.title,
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     sendToPopup({ type: "CAPTURE_ERROR", error: message });
@@ -116,6 +126,12 @@ function requestPageMetrics(tabId: number): Promise<PageMetrics> {
     chrome.runtime.onMessage.addListener(listener);
     sendToContent(tabId, { type: "GET_PAGE_METRICS" });
   });
+}
+
+function requestMarkdown(tabId: number): Promise<ExtractResult> {
+  // The content script replies synchronously via sendResponse, so the
+  // chrome.tabs.sendMessage promise resolves with the ExtractResult directly.
+  return sendToContent(tabId, { type: "EXTRACT_MARKDOWN" }) as Promise<ExtractResult>;
 }
 
 function waitForScrollDone(tabId: number): Promise<void> {
