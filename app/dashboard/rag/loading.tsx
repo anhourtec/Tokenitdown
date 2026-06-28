@@ -1,0 +1,10 @@
+import { ExplorerSkeleton, PageHeaderSkeleton } from "@/components/ui/page-skeletons"
+
+export default function Loading() {
+  return (
+    <div className="@container/main flex min-h-0 flex-1 flex-col gap-4 md:gap-6">
+      <PageHeaderSkeleton />
+      <ExplorerSkeleton leftSearch />
+    </div>
+  )
+}

@@ -42,6 +42,9 @@ Before running `git commit`, update `HANDOFF.md` so it reflects the work being c
 ### 9. Test everything with Playwright MCP when a task is done
 When a task is complete, verify it end-to-end in a real browser using the **Playwright MCP** tools (`mcp__playwright__*`) — not just the unit/e2e suites. Drive the actual flow the user cares about (log in, navigate, upload, convert, view, delete, etc.), confirm the rendered result and interactions work, and check the console for errors. Do this against the running dev server (`npm run dev`, currently `http://localhost:3000`; use the LAN origin if better-auth's trusted-origin check requires it). Don't declare a task finished until it's been exercised this way.
 
+### 10. Every page gets a loading skeleton shaped like that page
+Every route under `app/` must show a loading skeleton, and the skeleton must mirror **that specific page's layout** — never a single generic skeleton reused everywhere. When you add or restructure a page, add/update its skeleton to match its real structure (e.g. a two-pane explorer skeleton for list+viewer pages, a KPI-strip + chart + table skeleton for analytics, stacked cards for settings). Cover both entry points: a route-level `loading.tsx` for server-rendered/navigation loads, and an in-component skeleton for client components while they fetch. Shared, parameterized skeletons (e.g. one `ExplorerSkeleton` with variants) are fine **only** when the pages genuinely share a layout; reuse the *shape*, not a placeholder rectangle. Page-shaped skeletons live in `components/ui/page-skeletons.tsx`.
+
 ---
 
 ## High-level architecture
