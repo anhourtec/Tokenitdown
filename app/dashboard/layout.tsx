@@ -8,6 +8,12 @@ import { auth } from "@/lib/auth"
 import { HeaderActions } from "./_components/header/header-actions"
 import { AppSidebar } from "./_components/sidebar/app-sidebar"
 
+// The dashboard is auth-gated and per-user: never statically prerender it. Without
+// this, `next build` (which has no DB/session) prerenders child routes — e.g.
+// /dashboard/convert — into cached 404s. force-dynamic renders every dashboard
+// route per request.
+export const dynamic = "force-dynamic"
+
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   // Authoritative session check (middleware does an optimistic cookie check).
   const session = await auth.api.getSession({ headers: await headers() })
