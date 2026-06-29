@@ -425,11 +425,11 @@ page-shaped skeletons (`ExplorerSkeleton` topbar/leftSearch variants, `Dashboard
 library/documents/rag/account; the three client list pages render the explorer skeleton
 while fetching. **Never reuse one generic skeleton** — match the page's layout.
 
-**Branding & favicons:** `public/` holds `token_it_down_logo.png` + the favicon set +
-`anhourtec_logo_{lightbg,darkbg}.svg`. `app/layout.tsx` wires title/description/manifest/
+**Branding & favicons:** `public/` holds `token-it-down.svg` (the logo mark) + the favicon
+set + `anhourtec_logo_{lightbg,darkbg}.svg`. `app/layout.tsx` wires title/description/manifest/
 icons (NOT the 1.7 MB `favicon.svg` — optimize it first if you want it). `components/ui/
-brand-mark.tsx` renders the PNG via `next/image` (`unoptimized` — the optimizer softened the
-detailed illustration) for the sidebar and login overlay. **Login/register use the raw PNG
+brand-mark.tsx` renders the SVG via `next/image` (`unoptimized` — vector source stays crisp)
+for the sidebar and login overlay. **Login/register use the SVG
 via a plain `<img>`** (no optimization, per request). The login loading overlay shows the
 **user's avatar** (initials fallback) and the **theme-aware AnHourTec wordmark**.
 
