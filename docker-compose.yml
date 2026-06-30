@@ -129,6 +129,9 @@ services:
       # the mounted volume.
       MARKITDOWN_SERVICE_URL: http://markitdown:8000
       STORAGE_DIR: /data/uploads
+      # Proxy /docs/* to the docs container so docs are served at this origin
+      # (ip:WEB_PORT/docs). The docs app builds with basePath "/docs".
+      DOCS_INTERNAL_URL: http://docs:3040
     ports:
       # Host port is configurable (WEB_PORT) to avoid clashes with other apps on
       # the server. Keep BETTER_AUTH_URL in .env in sync with this port.
@@ -149,6 +152,26 @@ services:
       timeout: 5s
       retries: 5
       start_period: 40s
+    networks:
+      - tokenitdown-network
+
+  # Documentation site (Next.js + Nextra). Internal-only: the web app proxies
+  # /docs/* to it, so it needs no published host port. Reached at ip:WEB_PORT/docs.
+  docs:
+    build:
+      context: ./docs
+    image: tokenitdown-docs
+    container_name: tokenitdown-docs
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      NEXT_TELEMETRY_DISABLED: "1"
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://localhost:3040/docs').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     networks:
       - tokenitdown-network
 

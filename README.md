@@ -118,20 +118,32 @@ Open [http://localhost:3000](http://localhost:3000). Register, then convert from
 
 ## Deployment
 
-The self-hosted edition ships as a `docker compose` bundle — **web + Postgres + Redis + the MarkItDown processing service + the MCP server**. On the host, copy `.env.example` → `.env`, set real secrets (including `MARKITDOWN_SERVICE_TOKEN`), then:
+The self-hosted edition ships as a `docker compose` bundle — **web + Postgres + Redis + the MarkItDown processing service + the MCP server + the docs site**. On the host, copy `.env.example` → `.env`, set real secrets (including `MARKITDOWN_SERVICE_TOKEN`), then:
 
 ```bash
 ./deploy.sh
 ```
 
-This builds the images and brings the stack up; the web container waits for the processing service, ensures the database, and runs migrations on startup. App at `http://<host>:${WEB_PORT:-3030}`; the MCP endpoint at `http://<host>:${MCP_PORT:-8001}/mcp`.
+This builds the images and brings the stack up; the web container waits for the processing service, ensures the database, and runs migrations on startup. Everything is reachable through one origin:
+
+- **App** — `http://<host>:${WEB_PORT:-3030}`
+- **Docs** — `http://<host>:${WEB_PORT:-3030}/docs` (the web app proxies `/docs` to the docs container; there's also a **Docs** link in the sidebar)
+- **MCP endpoint** — `http://<host>:${MCP_PORT:-8001}/mcp`
 
 ## Documentation
 
-Full documentation lives in **[`docs/`](docs/)** — a [Nextra](https://nextra.site/) site. Run it locally:
+The docs are a [Nextra](https://nextra.site/) site in **[`docs/`](docs/)**, served at **`/docs`** on the running app (e.g. `http://<host>:3030/docs`) — no separate port. To work on them locally alongside the app:
 
 ```bash
-cd docs && npm install && npm run dev
+# terminal 1 — the app on :3000
+npm run dev
+
+# terminal 2 — the docs on :3040 (served under /docs via basePath)
+cd docs && npm install && npm run dev -- -p 3040
+
+# to preview the same-origin proxy, set DOCS_INTERNAL_URL in .env and restart the app:
+#   DOCS_INTERNAL_URL=http://localhost:3040
+# then open http://localhost:3000/docs
 ```
 
 It covers Getting Started, Self-Hosting, Configuration, Converting, the Library, RAG Export, the **AI agents / MCP** integration, Architecture, an API reference, the roadmap, and an FAQ.
