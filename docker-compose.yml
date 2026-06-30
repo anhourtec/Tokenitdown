@@ -68,6 +68,39 @@ services:
     networks:
       - tokenitdown-network
 
+  # Same image as `markitdown`, but run as the MCP server over streamable HTTP so
+  # coding agents (Claude Code, Cursor, VS Code, Claude Desktop) can reach this
+  # instance. PUBLISHED on the host (editors connect to it) and gated by a bearer
+  # token (TOKENITDOWN_MCP_TOKEN). Reuses the markitdown image — no second build.
+  markitdown-mcp:
+    image: tokenitdown-markitdown
+    container_name: tokenitdown-markitdown-mcp
+    restart: unless-stopped
+    command: ["python", "-m", "app.mcp_server"]
+    environment:
+      TOKENITDOWN_MCP_HTTP: "1"
+      TOKENITDOWN_MCP_TOKEN: ${TOKENITDOWN_MCP_TOKEN:?set TOKENITDOWN_MCP_TOKEN in .env}
+      TOKENITDOWN_MCP_PORT: "8001"
+      MAX_UPLOAD_BYTES: ${MAX_UPLOAD_BYTES:-52428800}
+    ports:
+      # Host port editors point at: http://<host>:${MCP_PORT}/mcp
+      - "${MCP_PORT:-8001}:8001"
+    depends_on:
+      # Ensures the shared image is built/available before this starts.
+      markitdown:
+        condition: service_started
+    healthcheck:
+      # The MCP endpoint is auth-gated and has no open /health route, so check the
+      # listening socket directly.
+      test:
+        ["CMD", "python", "-c", "import socket; socket.create_connection(('localhost', 8001), 2).close()"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - tokenitdown-network
+
   web:
     build:
       context: .
