@@ -3,23 +3,8 @@ import { DocsThemeConfig, useConfig } from 'nextra-theme-docs'
 
 const Logo = () => (
   <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700 }}>
-    <span
-      aria-hidden
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        width: 24,
-        height: 24,
-        borderRadius: 6,
-        background: 'linear-gradient(135deg, #2563EB, #60A5FA, #8B5CF6)',
-        color: '#fff',
-        fontSize: 13,
-        fontWeight: 800,
-      }}
-    >
-      T
-    </span>
+    {/* eslint-disable-next-line @next/next/no-img-element */}
+    <img src="/token-it-down.svg" alt="TokenItDown" width={24} height={24} />
     <span>TokenItDown</span>
     <span style={{ fontWeight: 400, opacity: 0.6 }}>docs</span>
   </span>
@@ -55,6 +40,7 @@ const config: DocsThemeConfig = {
     return (
       <>
         <title>{pageTitle}</title>
+        <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
         <meta name="description" content={description} />
         <meta name="theme-color" content="#2563EB" />
         <meta name="og:title" content={pageTitle} />

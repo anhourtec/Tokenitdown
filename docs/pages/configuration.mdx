@@ -20,10 +20,10 @@ All web-app environment variables are typed and validated through `env.mjs` ([T3
 
 | Variable | Required | Default | Purpose |
 |---|---|---|---|
-| `DATABASE_URL` | ✅ | — | PostgreSQL connection string used by Drizzle and better-auth. Inside compose the web container overrides this to `postgres:5432`. |
-| `BETTER_AUTH_SECRET` | ✅ | — | Secret better-auth uses to sign session cookies/tokens. Must be ≥ 32 chars. Generate: `openssl rand -base64 32`. |
-| `BETTER_AUTH_URL` | ✅ | — | The app's one canonical public URL (a single URL, not a list). Used for callbacks and the session cookie; an `https` value makes cookies `Secure`. Keep its port in sync with `WEB_PORT`. |
-| `MARKITDOWN_SERVICE_TOKEN` | ✅ | — | Shared secret sent as `X-Service-Token` to the converter and used to authenticate `/api/mcp/verify`. Must be ≥ 16 chars and **match** the converter's value. Generate: `openssl rand -base64 24`. |
+| `DATABASE_URL` | Yes | — | PostgreSQL connection string used by Drizzle and better-auth. Inside compose the web container overrides this to `postgres:5432`. |
+| `BETTER_AUTH_SECRET` | Yes | — | Secret better-auth uses to sign session cookies/tokens. Must be ≥ 32 chars. Generate: `openssl rand -base64 32`. |
+| `BETTER_AUTH_URL` | Yes | — | The app's one canonical public URL (a single URL, not a list). Used for callbacks and the session cookie; an `https` value makes cookies `Secure`. Keep its port in sync with `WEB_PORT`. |
+| `MARKITDOWN_SERVICE_TOKEN` | Yes | — | Shared secret sent as `X-Service-Token` to the converter and used to authenticate `/api/mcp/verify`. Must be ≥ 16 chars and **match** the converter's value. Generate: `openssl rand -base64 24`. |
 | `MARKITDOWN_SERVICE_URL` | — | `http://localhost:8000` | Base URL of the internal converter. Inside compose this is `http://markitdown:8000`. |
 | `REDIS_URL` | — | — | Redis connection string. Reserved for the job queue / future session store (sessions live in Postgres today). |
 | `TRUSTED_ORIGINS` | — | — | Extra comma-separated origins allowed by better-auth (CSRF / trusted origins) beyond `BETTER_AUTH_URL`. In dev the LAN URL is auto-added. |
@@ -60,7 +60,7 @@ The Python converter (`server/`) reads a small set of its own variables:
 
 | Variable | Required | Default | Purpose |
 |---|---|---|---|
-| `MARKITDOWN_SERVICE_TOKEN` | ✅ | — | Shared secret required on every `/convert*` call (constant-time compared). |
+| `MARKITDOWN_SERVICE_TOKEN` | Yes | — | Shared secret required on every `/convert*` call (constant-time compared). |
 | `MAX_UPLOAD_BYTES` | — | `52428800` | Max upload size; larger uploads return `413`. |
 
 ## Docker Compose credentials
@@ -71,8 +71,8 @@ The Python converter (`server/`) reads a small set of its own variables:
 | Variable | Required | Default | Purpose |
 |---|---|---|---|
 | `POSTGRES_USER` | — | `tokenitdown` | Postgres user provisioned in the container. |
-| `POSTGRES_PASSWORD` | ✅ | — | Postgres password (compose fails if unset). |
+| `POSTGRES_PASSWORD` | Yes | — | Postgres password (compose fails if unset). |
 | `POSTGRES_DB` | — | `tokenitdown` | Database name. |
-| `REDIS_PASSWORD` | ✅ | — | Redis password (Redis 7 requires it for non-loopback clients). |
+| `REDIS_PASSWORD` | Yes | — | Redis password (Redis 7 requires it for non-loopback clients). |
 | `WEB_PORT` | — | `3030` | Host port the web container is published on. Must match the port in `BETTER_AUTH_URL`. |
 | `DB_SSL` | — | `false` | Disable TLS for a LAN Postgres; set `true` for a TLS-only server. |

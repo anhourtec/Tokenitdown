@@ -8,7 +8,7 @@
 
 A fast, self-hostable platform that turns any document or web page into clean, LLM-ready Markdown — and goes past the conversion to deliver visible quality control, RAG-ready output, token economics, and native AI-agent (MCP) access.
 
-[Getting started](#getting-started) · [Documentation](docs/) · [Use it from any agent](#-use-it-from-any-ai-coding-agent-mcp) · [Contributing](CONTRIBUTING.md) · [Issues](../../issues)
+[Getting started](#getting-started) · [Documentation](docs/) · [Use it from any agent](#use-it-from-any-ai-coding-agent-mcp) · [Contributing](CONTRIBUTING.md) · [Issues](../../issues)
 
 ![Stars](https://img.shields.io/github/stars/anhourtec/tokenitdown?style=for-the-badge&labelColor=black&color=2563EB)
 ![Forks](https://img.shields.io/github/forks/anhourtec/tokenitdown?style=for-the-badge&labelColor=black&color=2563EB)
@@ -27,7 +27,7 @@ A fast, self-hostable platform that turns any document or web page into clean, L
 
 Built and maintained by **AnHourTec**.
 
-> ⭐ If TokenItDown saves you tokens, consider starring the repo — it genuinely helps other people find it.
+> If TokenItDown saves you tokens, consider starring the repo — it genuinely helps other people find it.
 
 ## Why TokenItDown
 
@@ -45,7 +45,7 @@ Two deployment targets from one codebase:
 - **Library** — every converted document in a file viewer with a **Preview / Raw** toggle (rendered Markdown via `react-markdown` + GFM, or syntax-highlighted source via Shiki), plus copy, download, and delete.
 - **Documents** — every **original** uploaded file, previewed in place, with an **Original / Markdown** toggle. Originals are stored on a local volume; the converted Markdown lives in Postgres.
 - **Real-data dashboard** — KPIs (documents, tokens saved, agent conversions, originals stored), a 30-day conversion-activity chart, recent conversions, source breakdown, and top token-savers.
-- **🤖 Use it from your AI coding agent (MCP)** — a built-in [Model Context Protocol](https://modelcontextprotocol.io) server lets Claude Code, Cursor, VS Code Copilot, or Claude Desktop call TokenItDown automatically the moment you hand the agent a file or URL. Runs **local (stdio)** for converting your own files with no account, or **hosted (HTTP)** for remote agents with a per-user API key.
+- **Use it from your AI coding agent (MCP)** — a built-in [Model Context Protocol](https://modelcontextprotocol.io) server lets Claude Code, Cursor, VS Code Copilot, or Claude Desktop call TokenItDown automatically the moment you hand the agent a file or URL. Runs **local (stdio)** for converting your own files with no account, or **hosted (HTTP)** for remote agents with a per-user API key.
 - **Works with any agent, not just Claude** — the Connect editor page offers per-editor install snippets and downloadable, instance-aware **`AGENTS.md` / `CLAUDE.md` / `skills.md`** drop-in files (viewable full-page) so Codex, Cursor, Gemini, Windsurf, Cline, Aider, or any MCP host knows to use TokenItDown.
 - **Per-user API keys + full transparency** — issue revocable API keys from the dashboard. Conversions an agent makes with a key run through the same pipeline as the dashboard (cleaned, token-counted, saved to your Library) and are attributed to that key, so the Connect page shows, per key, how many calls it made, tokens saved, and exactly what it converted.
 - **Auth** — email/password with httpOnly cookie sessions ([better-auth](https://www.better-auth.com/)) stored in Postgres, CSRF via trusted origins, protected dashboard.
@@ -59,7 +59,7 @@ Two deployment targets from one codebase:
 |       ![Convert](.github/screenshots/convert.png)        | ![Dashboard](.github/screenshots/dashboard.png) |
 |             _Convert any format_            |          _Real-data dashboard_           |
 
-## 🤖 Use it from any AI coding agent (MCP)
+## Use it from any AI coding agent (MCP)
 
 TokenItDown ships a [Model Context Protocol](https://modelcontextprotocol.io) server so your agent calls it the moment you hand it a file or URL — no copy-pasting, and a fraction of the tokens.
 
@@ -148,13 +148,7 @@ Conversion is powered by [Microsoft MarkItDown](https://github.com/microsoft/mar
 
 ## Star History
 
-<a href="https://www.star-history.com/?repos=anhourtec%2Ftokenitdown&type=date&legend=top-left">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=anhourtec/tokenitdown&type=date&theme=dark&legend=top-left" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=anhourtec/tokenitdown&type=date&legend=top-left" />
-   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=anhourtec/tokenitdown&type=date&legend=top-left" />
- </picture>
-</a>
+[![Star History Chart](https://api.star-history.com/svg?repos=anhourtec/tokenitdown&type=Date)](https://www.star-history.com/#anhourtec/tokenitdown&Date)
 
 ## License
 
