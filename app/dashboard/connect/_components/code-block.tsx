@@ -26,8 +26,8 @@ export function CodeBlock({ code, label }: { code: string; label?: string }) {
       {label && (
         <p className="mb-1 text-[0.7rem] text-muted-foreground uppercase tracking-wide">{label}</p>
       )}
-      <div className="relative rounded-lg border bg-muted/40">
-        <pre className="overflow-x-auto p-3 pr-12 font-mono text-foreground text-xs leading-relaxed">
+      <div className="flex items-start gap-1 rounded-lg border bg-muted/40">
+        <pre className="min-w-0 flex-1 overflow-x-auto p-3 font-mono text-foreground text-xs leading-relaxed">
           {code}
         </pre>
         <Button
@@ -36,7 +36,7 @@ export function CodeBlock({ code, label }: { code: string; label?: string }) {
           size="icon-sm"
           onClick={copy}
           aria-label="Copy to clipboard"
-          className="absolute top-1.5 right-1.5"
+          className="m-1 shrink-0"
         >
           {copied ? <Check className="size-4 text-primary" /> : <Copy className="size-4" />}
         </Button>
