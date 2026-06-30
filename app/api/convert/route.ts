@@ -1,5 +1,6 @@
 import { headers } from "next/headers"
 
+import { resolveRequestUser } from "@/lib/api-keys"
 import { auth } from "@/lib/auth"
 import { saveDocument } from "@/lib/documents"
 import { cleanMarkdown } from "@/lib/markdown/clean"
@@ -13,9 +14,16 @@ import { env } from "../../../env.mjs"
 // to disk via lib/documents.
 export const runtime = "nodejs"
 
-export async function POST(req: Request) {
+async function sessionUserId(): Promise<string | null> {
   const session = await auth.api.getSession({ headers: await headers() })
-  if (!session) {
+  return session?.user.id ?? null
+}
+
+export async function POST(req: Request) {
+  // Accept either a logged-in session (dashboard) or an API key (an AI agent via
+  // the MCP server). When it's a key, the saved document is tagged with it.
+  const actor = await resolveRequestUser(req, sessionUserId)
+  if (!actor) {
     return Response.json({ error: "Unauthorized" }, { status: 401 })
   }
 
@@ -41,7 +49,7 @@ export async function POST(req: Request) {
   }
 
   const bytes = Buffer.from(await file.arrayBuffer())
-  const prefs = await getPreferences(session.user.id)
+  const prefs = await getPreferences(actor.userId)
   // Explicit ?tier wins (API callers); otherwise use the user's saved default.
   const formTier = form.get("tier")
   const tier = formTier === "compact" ? "compact" : formTier === "clean" ? "clean" : prefs.defaultCleanTier
@@ -51,7 +59,8 @@ export async function POST(req: Request) {
     const { markdown, stats } = cleanMarkdown(raw, tier)
     const tokens = tokenSavings(raw, markdown)
     const doc = await saveDocument({
-      userId: session.user.id,
+      userId: actor.userId,
+      apiKeyId: actor.apiKeyId,
       title,
       sourceType: "file",
       sourceName: file.name || "upload",

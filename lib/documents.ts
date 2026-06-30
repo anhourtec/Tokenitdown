@@ -48,6 +48,8 @@ interface SaveDocumentInput {
   rawTokens?: number
   cleanTokens?: number
   cleanStats?: CleanStats | null
+  /** The API key that created this (agent via MCP); null for dashboard conversions. */
+  apiKeyId?: string | null
   /** Original bytes to persist on disk (uploads only). */
   original?: { bytes: Buffer; filename: string } | null
 }
@@ -89,6 +91,7 @@ export async function saveDocument(input: SaveDocumentInput): Promise<DocumentRe
       rawTokens: input.rawTokens ?? 0,
       cleanTokens: input.cleanTokens ?? 0,
       cleanStats: input.cleanStats ?? null,
+      apiKeyId: input.apiKeyId ?? null,
     })
     .returning()
 
