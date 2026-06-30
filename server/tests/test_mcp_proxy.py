@@ -10,7 +10,6 @@ import pytest
 from fastmcp.exceptions import ToolError
 
 import app.mcp_server as mcp_server
-from app.mcp_server import _decode_base64, _web_convert_document, _web_convert_url
 
 
 def _run(coro):
@@ -58,12 +57,12 @@ def _patch(monkeypatch, response):
 
 def test_decode_base64_rejects_garbage():
     with pytest.raises(ToolError, match="not valid base64"):
-        _decode_base64("!!!nope!!!")
+        mcp_server._decode_base64("!!!nope!!!")
 
 
 def test_proxy_url_forwards_key_and_returns_markdown(monkeypatch):
     _patch(monkeypatch, _FakeResponse(200, {"markdown": "# Hello", "title": "Hello"}))
-    md = _run(_web_convert_url("tid_secret", "https://example.com"))
+    md = _run(mcp_server._web_convert_url("tid_secret", "https://example.com"))
     assert md == "# Hello"
     assert _FakeClient.last["url"] == "http://web:3000/api/convert/url"
     assert _FakeClient.last["headers"]["Authorization"] == "Bearer tid_secret"
@@ -72,7 +71,7 @@ def test_proxy_url_forwards_key_and_returns_markdown(monkeypatch):
 
 def test_proxy_document_sends_multipart(monkeypatch):
     _patch(monkeypatch, _FakeResponse(200, {"markdown": "data"}))
-    md = _run(_web_convert_document("tid_secret", b"a,b\n1,2\n", "scores.csv"))
+    md = _run(mcp_server._web_convert_document("tid_secret", b"a,b\n1,2\n", "scores.csv"))
     assert md == "data"
     assert _FakeClient.last["url"] == "http://web:3000/api/convert"
     assert "file" in _FakeClient.last["files"]
@@ -83,10 +82,10 @@ def test_proxy_document_sends_multipart(monkeypatch):
 def test_proxy_surfaces_web_error_message(monkeypatch):
     _patch(monkeypatch, _FakeResponse(422, {"error": "This page could not be converted."}))
     with pytest.raises(ToolError, match="could not be converted"):
-        _run(_web_convert_url("tid_secret", "https://example.com"))
+        _run(mcp_server._web_convert_url("tid_secret", "https://example.com"))
 
 
 def test_proxy_unauthorized_is_surfaced(monkeypatch):
     _patch(monkeypatch, _FakeResponse(401, {"error": "Unauthorized"}))
     with pytest.raises(ToolError, match="Unauthorized"):
-        _run(_web_convert_url("tid_bad", "https://example.com"))
+        _run(mcp_server._web_convert_url("tid_bad", "https://example.com"))

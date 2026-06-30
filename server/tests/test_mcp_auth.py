@@ -4,7 +4,6 @@ import asyncio
 import contextlib
 
 import app.mcp_auth as mcp_auth
-from app.mcp_auth import TokenItDownVerifier
 
 
 def _run(coro):
@@ -49,7 +48,7 @@ def _patch_http(monkeypatch, response):
 
 
 def test_admin_token_accepted_without_network():
-    v = TokenItDownVerifier(admin_token="admin-secret-123")
+    v = mcp_auth.TokenItDownVerifier(admin_token="admin-secret-123")
     tok = _run(v.verify_token("admin-secret-123"))
     assert tok is not None
     assert tok.client_id == "admin"
@@ -57,17 +56,17 @@ def test_admin_token_accepted_without_network():
 
 
 def test_wrong_admin_token_rejected():
-    v = TokenItDownVerifier(admin_token="admin-secret-123")
+    v = mcp_auth.TokenItDownVerifier(admin_token="admin-secret-123")
     assert _run(v.verify_token("nope")) is None
 
 
 def test_empty_token_rejected():
-    v = TokenItDownVerifier(admin_token="admin-secret-123")
+    v = mcp_auth.TokenItDownVerifier(admin_token="admin-secret-123")
     assert _run(v.verify_token("")) is None
 
 
 def test_per_user_key_validated_via_web(monkeypatch):
-    v = TokenItDownVerifier(verify_url="http://web:3000/api/mcp/verify", service_token="svc-tok")
+    v = mcp_auth.TokenItDownVerifier(verify_url="http://web:3000/api/mcp/verify", service_token="svc-tok")
     with _patch_http(monkeypatch, _FakeResponse(200, {"userId": "user_42"})):
         tok = _run(v.verify_token("tid_abc123"))
     assert tok is not None
@@ -78,14 +77,14 @@ def test_per_user_key_validated_via_web(monkeypatch):
 
 
 def test_per_user_key_rejected_on_401(monkeypatch):
-    v = TokenItDownVerifier(verify_url="http://web:3000/api/mcp/verify", service_token="svc-tok")
+    v = mcp_auth.TokenItDownVerifier(verify_url="http://web:3000/api/mcp/verify", service_token="svc-tok")
     with _patch_http(monkeypatch, _FakeResponse(401, {"error": "Invalid key."})):
         assert _run(v.verify_token("tid_bad")) is None
 
 
 def test_admin_checked_before_web(monkeypatch):
     # An admin-token match must short-circuit before any network call.
-    v = TokenItDownVerifier(
+    v = mcp_auth.TokenItDownVerifier(
         admin_token="admin-secret-123",
         verify_url="http://web:3000/api/mcp/verify",
         service_token="svc-tok",
