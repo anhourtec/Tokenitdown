@@ -8,8 +8,14 @@ updates:
     open-pull-requests-limit: 5
     labels: ["dependencies", "javascript"]
     groups:
-      # One PR for all non-major npm updates; majors stay individual for review.
-      npm-minor-and-patch:
+      # All dev/tooling updates — including majors like storybook, vitest, jsdom,
+      # @types/node — collapse into a single PR (they rarely affect runtime).
+      npm-development:
+        dependency-type: development
+      # Production runtime: only non-major here. Production majors (e.g. zod,
+      # @vercel/otel) still arrive individually so they get a careful review.
+      npm-production:
+        dependency-type: production
         update-types: [minor, patch]
 
   # ---- Processing service (pip) ----
