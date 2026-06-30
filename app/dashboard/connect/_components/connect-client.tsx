@@ -1,51 +1,20 @@
 "use client"
 
-import { Check, Copy, FileText, Globe, Upload } from "lucide-react"
+import { FileText, Globe, Upload } from "lucide-react"
 import * as React from "react"
-import { toast } from "sonner"
 
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
 
-/** A code block with a copy-to-clipboard button. */
-function CodeBlock({ code, label }: { code: string; label?: string }) {
-  const [copied, setCopied] = React.useState(false)
+import { AgentFilesCard } from "./agent-files-card"
+import { ApiKeysPanel } from "./api-keys-panel"
+import { CodeBlock } from "./code-block"
 
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(code)
-      setCopied(true)
-      toast.success("Copied to clipboard")
-      setTimeout(() => setCopied(false), 1500)
-    } catch {
-      toast.error("Couldn't copy — select and copy manually.")
-    }
-  }
-
-  return (
-    <div className="relative">
-      {label && (
-        <p className="mb-1 text-[0.7rem] text-muted-foreground uppercase tracking-wide">{label}</p>
-      )}
-      <div className="relative rounded-lg border bg-muted/40">
-        <pre className="overflow-x-auto p-3 pr-12 font-mono text-foreground text-xs leading-relaxed">
-          {code}
-        </pre>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-sm"
-          onClick={copy}
-          aria-label="Copy to clipboard"
-          className="absolute top-1.5 right-1.5"
-        >
-          {copied ? <Check className="size-4 text-primary" /> : <Copy className="size-4" />}
-        </Button>
-      </div>
-    </div>
-  )
+interface AgentFile {
+  name: string
+  title: string
+  description: string
 }
 
 interface Editor {
@@ -126,14 +95,11 @@ const TOOLS = [
   },
 ]
 
-export function ConnectClient({ mcpUrl }: { mcpUrl: string }) {
+export function ConnectClient({ mcpUrl, agentFiles }: { mcpUrl: string; agentFiles: AgentFile[] }) {
   const list = React.useMemo(editors, [])
   const [active, setActive] = React.useState(() => list[0]?.id ?? "")
   const editor = list.find((e) => e.id === active)
   if (!editor) return null
-
-  const remoteSnippet = `claude mcp add --transport http tokenitdown ${mcpUrl} \\
-  --header "Authorization: Bearer $TOKENITDOWN_MCP_TOKEN"`
 
   return (
     <div className="flex max-w-3xl flex-col gap-4">
@@ -187,28 +153,11 @@ export function ConnectClient({ mcpUrl }: { mcpUrl: string }) {
         </CardContent>
       </Card>
 
-      {/* Hosted / remote */}
-      <Card>
-        <CardHeader className="gap-1">
-          <div className="flex items-center gap-2">
-            <CardTitle className="text-base">Use the hosted endpoint</CardTitle>
-            <Badge variant="secondary">Team</Badge>
-          </div>
-          <CardDescription>
-            This instance already runs the MCP server as the <code className="font-mono">markitdown-mcp</code>{" "}
-            container (from <code className="font-mono">./deploy.sh</code>), so agents on any machine
-            can reach it — no local setup. Add it to Claude Code with your bearer token:
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-3">
-          <CodeBlock code={remoteSnippet} label="Connect to the hosted endpoint" />
-          <p className="text-muted-foreground text-xs">
-            The token is <code className="font-mono">TOKENITDOWN_MCP_TOKEN</code> from this
-            instance&rsquo;s <code className="font-mono">.env</code>. Published on port 8001 by
-            default — front it with your reverse proxy/TLS for public use.
-          </p>
-        </CardContent>
-      </Card>
+      {/* Hosted access, per-user keys, and per-key usage/transparency */}
+      <ApiKeysPanel mcpUrl={mcpUrl} />
+
+      {/* Drop-in instruction files for any agent — preview inline + download */}
+      <AgentFilesCard files={agentFiles} />
     </div>
   )
 }

@@ -1,11 +1,11 @@
 import { headers } from "next/headers"
 import { redirect } from "next/navigation"
 
+import { agentFileList } from "@/lib/agent-files"
 import { auth } from "@/lib/auth"
 
 import { ConnectClient } from "./_components/connect-client"
 import { env } from "../../../env.mjs"
-
 
 export const metadata = {
   title: "Connect your editor · TokenItDown",
@@ -29,7 +29,7 @@ export default async function ConnectPage() {
           calls TokenItDown and gets clean, LLM-ready Markdown back — no copy-pasting.
         </p>
       </div>
-      <ConnectClient mcpUrl={mcpUrl} />
+      <ConnectClient mcpUrl={mcpUrl} agentFiles={agentFileList()} />
     </div>
   )
 }
