@@ -541,6 +541,64 @@ throwaway local account `mcptester@example.com` to log in — safe to delete.)
 - Publish a `uvx`-installable package so editor users don't need the repo checked out
   (the stdio snippets currently assume the `server/` dir is importable).
 
+## Phase — Per-user API keys, agent transparency & cross-agent files (2026-06-29)
+
+Built on the MCP server to make agent access metered, multi-tenant, and fully
+transparent, and to work with **every** agent (not just Claude).
+
+**Per-user API keys (web):**
+- `api_key` table (`lib/db/schema.ts`, migration `0005_parched_lyja.sql`): id, userId,
+  name, `keyHash` (SHA-256 — token stored hashed, never plaintext), `lastFour`,
+  timestamps, `revokedAt`. `document` gained `apiKeyId` (+ index) so each agent
+  conversion is attributed to the key that made it.
+- `lib/api-keys.ts`: `generateApiKey` (`tid_<base64url>`), `hashKey`, create/list/revoke,
+  `verifyApiKey` (→ userId + apiKeyId, touches lastUsedAt), `listApiKeysWithUsage`
+  (calls + tokens saved per key, from documents), `listKeyConversions`, and
+  `resolveRequestUser` (Bearer `tid_…` key OR session). Unit-tested (`api-keys.test.ts`,
+  db mocked).
+- Routes: `GET/POST /api/keys`, `DELETE /api/keys/[id]` (revoke), `GET /api/keys/[id]`
+  (a key's conversions), and internal `POST /api/mcp/verify` (service-token-gated, used
+  by the MCP server).
+- `app/api/convert` + `app/api/convert/url` now accept an API key (Bearer) in addition
+  to a session, and tag the saved document with `apiKeyId`.
+
+**Transparency = route agents through the same pipeline (the chosen design):**
+- The HTTP-mode MCP tools no longer convert in-process — they **proxy to the web app's
+  convert pipeline** with the agent's key (`server/app/mcp_server.py` `_web_convert_*`,
+  using `get_access_token()`), so agent conversions are cleaned, token-counted, saved to
+  the user's Library, and attributed to the key. The verifier
+  (`server/app/mcp_auth.py` `TokenItDownVerifier`) validates a key via `/api/mcp/verify`
+  (or an optional static admin token). Unit-tested: `test_mcp_auth.py`, `test_mcp_proxy.py`
+  (network mocked). `docker-compose` `markitdown-mcp` now gets `TOKENITDOWN_WEB_URL` +
+  `MARKITDOWN_SERVICE_TOKEN`; `TOKENITDOWN_MCP_TOKEN` is now an optional admin token.
+- **Connect editor** page gained: an **API keys panel** (`api-keys-panel.tsx`) — create
+  (token shown once with a ready-to-paste snippet), list with **calls + tokens saved +
+  last used**, expand to a per-key **activity feed** of what the agent converted, and
+  revoke.
+
+**Cross-agent drop-in files:**
+- `lib/agent-files.ts` generates instance-aware `AGENTS.md` / `CLAUDE.md` / `skills.md`
+  (MCP URL + dashboard baked in). `GET /api/agent-files/[name]` serves them as downloads;
+  a full-page GitHub-style viewer at `/dashboard/connect/files/[name]` (+ skeleton) renders
+  them inline. Connect page lists them with **Open** (full page) + **Download**.
+
+**Verified:** `tsc` 0 errors · `eslint` clean · `vitest` 52/52 · server `pytest` 44/44 ·
+migration applied. **Live end-to-end (Playwright on `:3000`, with a local markitdown on
+:8000):** created a key in the UI (token shown once), called `POST /api/convert/url` with
+that `Bearer tid_…` key → conversion saved → the Connect page then showed the key with
+**1 call** and its activity feed listing the converted page; agent drop-in files render
+full-page with the instance URL baked in; 0 console errors throughout. (The MCP HTTP
+*transport* couldn't be booted locally — a `uvicorn`/`websockets` venv quirk,
+`KeyError: 'websockets-sansio'`; unaffected in Docker where deps are pinned. The proxy
+path itself is proven by the direct `/api/convert/url` key call above.)
+
+**Next for this area:**
+- Library/Documents: show which conversions came from an agent (badge by `apiKeyId`) and
+  allow filtering by key.
+- Per-key rate limits / quotas; optional key expiry.
+- Library tools over MCP (list/fetch/search) now that keys + DB attribution exist.
+- Resolve the local `uvicorn`/`websockets` pin so the HTTP transport runs outside Docker.
+
 ## Next Steps
 1. **Fix the Docker prerender 404 (blocker for Docker deploy):** auth-gated dashboard
    child routes (`/dashboard/convert/*`, `/dashboard/library`, `/dashboard/documents`)

@@ -52,10 +52,18 @@ security-reviewed path.
 
 Two run modes (selected by `TOKENITDOWN_MCP_HTTP`):
 
-| Mode | For | Tools exposed | Auth |
-|------|-----|---------------|------|
-| **stdio** (default) | local editors; converts files on the user's own machine in-process | `convert_url_to_markdown`, `convert_file_to_markdown` | none (local subprocess) |
-| **streamable HTTP** | hosted / self-hosted, reachable by remote clients | `convert_url_to_markdown`, `convert_document` (base64 upload) | `Authorization: Bearer $TOKENITDOWN_MCP_TOKEN` |
+| Mode | For | Tools exposed | Auth | Conversion |
+|------|-----|---------------|------|------------|
+| **stdio** (default) | local editors; the user's own machine | `convert_url_to_markdown`, `convert_file_to_markdown` | none (local subprocess) | in-process |
+| **streamable HTTP** | hosted; remote agents | `convert_url_to_markdown`, `convert_document` (base64 upload) | per-user API key (Bearer) and/or optional static admin token | **proxied to the web app's pipeline** |
+
+In HTTP mode the agent authenticates with a **per-user API key** (minted in the
+dashboard). The server validates the key against the web app's `/api/mcp/verify`
+endpoint (using the shared `MARKITDOWN_SERVICE_TOKEN`) and **proxies each
+conversion to the web app's convert pipeline**, forwarding the key — so the agent
+gets the same cleaned + token-counted Markdown a dashboard user does, the result
+is saved to that user's Library, and the conversion is attributed to the key
+(powering the dashboard's per-key transparency view). See `app/mcp_auth.py`.
 
 Security boundary: the local-filesystem tool is registered **only** in stdio
 mode. Over HTTP a `path` argument would be an arbitrary server-side file read,
@@ -67,27 +75,33 @@ SSRF-guarded in both modes.
 python -m app.mcp_server
 npx @modelcontextprotocol/inspector python -m app.mcp_server
 
-# Hosted (HTTP) — requires a bearer token:
-TOKENITDOWN_MCP_HTTP=1 TOKENITDOWN_MCP_TOKEN=$(openssl rand -base64 24) \
-  python -m app.mcp_server          # serves http://0.0.0.0:8001/mcp/
+# Hosted (HTTP) — validates per-user keys via the web app:
+TOKENITDOWN_MCP_HTTP=1 TOKENITDOWN_WEB_URL=http://web:3000 \
+  MARKITDOWN_SERVICE_TOKEN=<shared secret> python -m app.mcp_server   # serves :8001/mcp/
 ```
 
-| Variable                | Default   | Purpose                                  |
-|-------------------------|-----------|------------------------------------------|
-| `TOKENITDOWN_MCP_HTTP`  | _(unset)_ | `1` → streamable-HTTP mode; else stdio   |
-| `TOKENITDOWN_MCP_TOKEN` | _(unset)_ | Bearer token; **required** in HTTP mode  |
-| `TOKENITDOWN_MCP_HOST`  | `0.0.0.0` | HTTP bind host                           |
-| `TOKENITDOWN_MCP_PORT`  | `8001`    | HTTP bind port                           |
+| Variable                  | Default   | Purpose                                                    |
+|---------------------------|-----------|------------------------------------------------------------|
+| `TOKENITDOWN_MCP_HTTP`    | _(unset)_ | `1` → streamable-HTTP mode; else stdio                     |
+| `TOKENITDOWN_WEB_URL`     | _(unset)_ | Web app base URL — required in HTTP mode (key validation + proxy) |
+| `MARKITDOWN_SERVICE_TOKEN`| _(unset)_ | Shared secret used to call the web app's internal endpoints |
+| `TOKENITDOWN_MCP_TOKEN`   | _(unset)_ | Optional static admin token (escape hatch)                 |
+| `TOKENITDOWN_MCP_HOST`    | `0.0.0.0` | HTTP bind host                                             |
+| `TOKENITDOWN_MCP_PORT`    | `8001`    | HTTP bind port                                             |
 
 ### Adding it to an editor
 
 ```bash
 # Claude Code — local:
 claude mcp add tokenitdown -- python -m app.mcp_server
-# Claude Code — hosted:
+# Claude Code — hosted (create a key on the dashboard's Connect editor page):
 claude mcp add --transport http tokenitdown https://mcp.your-host/mcp \
-  --header "Authorization: Bearer $TOKEN"
+  --header "Authorization: Bearer YOUR_TOKENITDOWN_API_KEY"
 ```
+
+The dashboard's **Connect editor** page also offers per-agent install snippets and
+downloadable `AGENTS.md` / `CLAUDE.md` / `skills.md` drop-in files so any agent
+(Codex, Cursor, Gemini, Windsurf, …) knows to use TokenItDown.
 
 ```jsonc
 // Cursor ~/.cursor/mcp.json  ·  Claude Desktop claude_desktop_config.json

@@ -21,14 +21,18 @@ Two deployment targets from one codebase:
 - **Per-format convert pages** — a dedicated page per source type (Md PDF, Md Docs, Md PPTX, Md Excel, Md Image, Md Audio, Md HTML, Md Data, Md ZIP, Md EPUB, Md URL), each with drag-and-drop batch upload, a document-scan animation while converting, and a GitHub-style rendered result.
 - **Library** — every converted document in a resizable file viewer with a **Preview / Raw** toggle (rendered Markdown via `react-markdown` + GFM, or syntax-highlighted source via Shiki), plus copy, download, and delete.
 - **Documents** — every **original** uploaded file, previewed in place: PDFs in the browser's native viewer, images inline, others downloadable — with an **Original / Markdown** toggle and delete. Originals are stored on a local volume; the converted Markdown lives in Postgres.
+- **Use it from your AI coding agent (MCP)** — a built-in [Model Context Protocol](https://modelcontextprotocol.io) server (`server/app/mcp_server.py`) lets Claude Code, Cursor, VS Code Copilot, or Claude Desktop call TokenItDown automatically the moment you hand the agent a file or URL. Runs **local (stdio)** for converting your own files in place with no account, or **hosted (HTTP)** for remote agents authenticated with a per-user API key. See the in-dashboard **Connect editor** page.
+- **Works with any agent, not just Claude** — the Connect editor page offers per-editor install snippets and downloadable, instance-aware **`AGENTS.md` / `CLAUDE.md` / `skills.md`** drop-in files (viewable full-page, GitHub-style) so Codex, Cursor, Gemini, Windsurf, Cline, Aider, or any MCP host knows to use TokenItDown.
+- **Per-user API keys + full transparency** — issue revocable API keys from the dashboard. Conversions an agent makes with a key run through the same pipeline as the dashboard (cleaned, token-counted, saved to your Library) and are attributed to that key, so the **Connect editor** page shows, per key, how many calls it made, tokens saved, and exactly what it converted.
 - **Auth** — email/password with httpOnly cookie sessions ([better-auth](https://www.better-auth.com/)) stored in Postgres, CSRF via trusted origins, protected dashboard.
 - **Admin dashboard** — shadcn-style sidebar, theme switcher (light/dark/system), and account menu.
 
 ## Architecture
 
-- **Web** — Next.js app (dashboard, auth, API routes). Conversions are proxied from `app/api/convert*` to the processing service over an internal network, gated by a shared secret.
+- **Web** — Next.js app (dashboard, auth, API routes). Conversions are proxied from `app/api/convert*` to the processing service over an internal network, gated by a shared secret. The convert routes accept either a session (dashboard) or an `Authorization: Bearer tid_…` API key (agents).
 - **Processing service** (`server/`) — a Python [FastAPI](https://fastapi.tiangolo.com/) wrapper around `markitdown[all]` with `/convert` (uploads) and `/convert-url` (SSRF-guarded). Internal-only.
-- **Postgres** — users, sessions, and converted documents (Drizzle ORM).
+- **MCP server** (`server/app/mcp_server.py`) — the `markitdown-mcp` container. In hosted/HTTP mode it authenticates an agent's API key and **proxies conversions back through the web pipeline**, so agent activity is cleaned, tracked, and saved like any other conversion.
+- **Postgres** — users, sessions, converted documents (tagged with the API key that created them), and API keys (Drizzle ORM). Keys are stored as SHA-256 hashes; the full token is shown once.
 - **Redis** — reserved for the job queue / session store.
 
 ## Tech stack
