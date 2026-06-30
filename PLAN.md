@@ -3,7 +3,7 @@
 **Company:** AnHourTec
 **Working names:** `TokenItDown` (token/agent theme) · `Markpipe` (clean/descriptive) — *final name TBD; Readymark held as backup*
 **Status:** Planning / pre-build
-**Last updated:** 2026-06-28
+**Last updated:** 2026-06-29
 
 > **Note:** The current repository is scaffolded on **Next.js 15 / React 19**. This plan proposes Nuxt 3 / Vue 3 for the dashboard — confirm the final framework direction before building product UI. See `HANDOFF.md`.
 
@@ -131,7 +131,8 @@ Bundles land directly in the user's library, pushed to the platform via authenti
 ### 4.5 Agent Integration — "any chatbot reads the .md directly"
 
 - **Bundled MCP server** — Claude consumes MCP natively; ChatGPT supports MCP via connectors/Apps. One MCP server satisfies both — no separate integrations.
-  - Tools exposed: list documents, fetch Markdown by id, search library, fetch context bundle.
+  - **✅ Conversion tools shipped** (`server/app/mcp_server.py`, FastMCP): `convert_url_to_markdown` (both modes), `convert_file_to_markdown` (stdio/local only — reads the user's own files), `convert_document` (HTTP/base64 upload). stdio for editors (Claude Code / Cursor / VS Code / Claude Desktop), streamable-HTTP + bearer token for the hosted endpoint. Conversion engine is shared with the REST service via `server/app/conversion.py`. This is the "any coding agent uses TokenItDown automatically when handed a file or URL" wedge.
+  - **TODO — library tools:** list documents, fetch Markdown by id, search library, fetch context bundle (these need the per-user API-key system below + DB access from the MCP layer).
 - **REST API** — programmatic convert + fetch for pipelines and the extension; Bearer API keys (hashed, per-user, revocable). `POST /api/v1/convert`.
 - **CLI tool** — `npm i -g tokenitdown`, then `tokenitdown convert <file>` (or `npx`); guided setup stores the API key. A developer/agent/CI wedge over the REST API. See `plans/clean-process-outputs-and-competitive-coverage.md` §4.5.
 - **Anonymous try-it demo** — convert without signup (page 1 only, ≤5 MB, ephemeral, strict rate limit) to sell the token-savings value top-of-funnel. See §4.7 of the same plan.

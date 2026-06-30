@@ -4,7 +4,7 @@
 
 **Project:** TokenItDown — document & web → LLM-ready Markdown platform
 **Company:** AnHourTec · **Package manager:** npm only
-**Last updated:** 2026-06-28
+**Last updated:** 2026-06-29
 
 ---
 
@@ -456,6 +456,90 @@ via a plain `<img>`** (no optimization, per request). The login loading overlay 
 - `lib/db/schema.ts` column names are camelCase to match better-auth defaults;
   `drizzle.config.ts` sets `casing: "camelCase"`. Regenerate via the better-auth
   CLI if plugins change, then `npm run db:generate`.
+
+## Phase — MCP server (agent integration) (2026-06-29)
+
+Goal (from the user): make coding agents call TokenItDown automatically — when a
+developer in Claude Code / Cursor / VS Code hands their agent a file or a URL, the
+agent calls our tool and gets clean Markdown. This is "tool calling" exposed over
+**MCP** (the open standard every agent editor speaks).
+
+**Built (Python processing service):**
+- `server/app/conversion.py` (NEW) — extracted the document/URL→Markdown core out of
+  `main.py` so the HTTP API and the MCP server share **one** security-reviewed path.
+  Typed errors (`OversizeError`/`EmptyInputError`/`FetchError`/`UnsupportedContentError`,
+  + `UnsafeURLError` re-export); `convert_bytes(..., max_bytes=)`, `convert_url(...)`.
+- `server/app/main.py` (REFACTORED) — the two routes now delegate to `conversion.py`
+  and map the typed errors to the same HTTP status codes as before (400/413/422).
+  Behaviour unchanged; existing tests still green.
+- `server/app/mcp_server.py` (NEW) — FastMCP server, two modes via `TOKENITDOWN_MCP_HTTP`:
+  - **stdio** (default, for editors): tools `convert_url_to_markdown` +
+    `convert_file_to_markdown(path)` — converts the user's *own* local files
+    in-process, no upload/account.
+  - **streamable HTTP** (hosted): tools `convert_url_to_markdown` +
+    `convert_document(content_base64, filename)`; bearer-token auth via
+    `StaticTokenVerifier` (`TOKENITDOWN_MCP_TOKEN`). `main()` refuses to start HTTP
+    without a token.
+  - **Security boundary:** the filesystem-path tool is registered **only** in stdio
+    mode (local machine); HTTP callers send base64 bytes so there's no server-side
+    arbitrary file read. URL conversion stays SSRF-guarded in both modes.
+- `server/requirements.txt` — added `fastmcp==2.13.0.2`. **Pinned to 2.x on purpose:**
+  fastmcp 3.x requires `starlette>=1.0.1`, which conflicts with the `starlette<0.42`
+  cap from `fastapi==0.115.6`. 2.13.0.2 co-installs cleanly with the existing stack.
+- `server/tests/test_mcp_server.py` (NEW) — 11 tests via FastMCP's in-memory client:
+  tool-registration boundary (file tool stdio-only, document tool http-only), real
+  CSV file + base64 conversions, missing-path/oversize/bad-base64 → `ToolError`,
+  SSRF block, auth wiring.
+
+**Verified:** full `pytest` suite green (35 tests) on a `python3.12` venv
+(`server/.venv-mcp/`, gitignored). Also smoke-tested the **real** stdio entrypoint
+over a subprocess MCP client — it boots, lists both tools, and converts a local file
+end-to-end. `/security-review` run on the diff: no HIGH/MEDIUM findings.
+
+**Docs:** `server/README.md` has a full "MCP server" section (modes table, env vars,
+editor install snippets for Claude Code / Cursor / VS Code / Claude Desktop);
+`PLAN.md` §4.5 marks the conversion tools shipped (library tools still TODO).
+
+**Follow-on (same day) — shipped the UI + deploy wiring:**
+- **Hosted MCP in Docker:** `docker-compose.yml` now has a `markitdown-mcp` service
+  — reuses the `tokenitdown-markitdown` image (already has `fastmcp`), runs
+  `python -m app.mcp_server` in HTTP mode, **published** on `${MCP_PORT:-8001}`,
+  gated by `TOKENITDOWN_MCP_TOKEN`. Socket healthcheck (the MCP endpoint is
+  auth-gated, no open `/health`). `./deploy.sh` brings it up automatically (no
+  script change needed — it does `compose build` + `up -d` for all services).
+  Added `TOKENITDOWN_MCP_TOKEN` + `MCP_PORT` to `.env.example`. `docker compose
+  config` validates.
+- **"Connect editor" dashboard page** (`app/dashboard/connect/`): server `page.tsx`
+  (auth-gated, derives the hosted endpoint `http://<host>:8001/mcp` from
+  `BETTER_AUTH_URL`) + client `connect-client.tsx` (editor tab switcher → per-editor
+  install snippet with copy button for Claude Code / Cursor / VS Code / Claude
+  Desktop, a "what your agent can do" tool list, and the hosted-endpoint card).
+  Nav item "Connect editor" added to `navigation/sidebar/sidebar-items.ts` (AI
+  group, `Plug2` icon). Route `loading.tsx` + a page-shaped `ConnectSkeleton` in
+  `components/ui/page-skeletons.tsx` (rule #10). No `Tabs`/clipboard primitives
+  exist in the repo — built inline (button row + `navigator.clipboard`).
+- **Moved the sidebar "Looking for something more?" support card → Settings page.**
+  Deleted `app/dashboard/_components/sidebar/sidebar-support-card.tsx` (now unused);
+  removed it from `app-sidebar.tsx`; added an equivalent card (full-width, GitHub
+  button) at the bottom of `app/dashboard/settings/page.tsx`.
+- **Fixed the `gpt-tokenizer` typecheck error:** it was in `package.json` but missing
+  from `node_modules` — `npm install --legacy-peer-deps` restored it. `package-lock`
+  unchanged. **Whole-project `tsc --noEmit` is now 0 errors.**
+
+**Verified:** `tsc` 0 errors · `eslint` clean on changed files · `vitest run` 49/49 ·
+server `pytest` 35/35 · `docker compose config` valid · Playwright on `:3000`: the
+Connect page renders, editor tabs switch the snippet, copy works, **0 console
+errors**; Settings shows the support card; the sidebar no longer does. (Used a
+throwaway local account `mcptester@example.com` to log in — safe to delete.)
+
+**MCP next steps:**
+- Per-user API keys (hashed, revocable) to replace the single static bearer token,
+  shared with the planned REST API (`POST /api/v1/convert`). The Connect page would
+  then show each user's own key instead of the `$TOKENITDOWN_MCP_TOKEN` placeholder.
+- Library tools (list/fetch-by-id/search/context-bundle) — need DB access from the
+  MCP layer + the API-key system.
+- Publish a `uvx`-installable package so editor users don't need the repo checked out
+  (the stdio snippets currently assume the `server/` dir is importable).
 
 ## Next Steps
 1. **Fix the Docker prerender 404 (blocker for Docker deploy):** auth-gated dashboard
