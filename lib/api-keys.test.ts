@@ -1,6 +1,6 @@
+import { describe, expect, it, vi } from "vitest"
 import { createHash } from "crypto"
 
-import { describe, expect, it, vi } from "vitest"
 
 // hashKey/generateApiKey are pure crypto; stub the db module so importing
 // api-keys here doesn't construct a Postgres pool.

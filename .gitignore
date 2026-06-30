@@ -52,3 +52,7 @@ server/.pytest_cache/
 # local agent working files (not part of the public repo)
 HANDOFF.md
 CLAUDE.md
+# internal planning / competitive-strategy notes (kept local, not published)
+plans/
+# local-only demo data seed (populates a dev DB for screenshots)
+scripts/seed-demo.mjs
