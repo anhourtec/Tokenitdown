@@ -15,7 +15,7 @@ By participating you agree to keep the project a welcoming, harassment-free spac
   (stdio or hosted HTTP), and the exact install snippet you used. Compatibility
   reports are especially valuable since the goal is to work with *every* agent.
 - **Propose a feature** — open an issue first so we can align on scope before you
-  build. See [docs/PLAN.md](./docs/PLAN.md) for the roadmap.
+  build. See the [roadmap](./docs/pages/roadmap.mdx) for what's planned.
 - **Send a pull request** — see below.
 
 Check the [open issues](../../issues) for things to work on; anything tagged
@@ -46,7 +46,7 @@ cd server && python3.12 -m venv .venv
 ./.venv/bin/pip install -r requirements-dev.txt
 ```
 
-See [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) for how the pieces fit together.
+See the [architecture docs](./docs/pages/architecture.mdx) for how the pieces fit together.
 
 ## Project conventions
 
