@@ -104,6 +104,6 @@ export const sidebarItems: NavGroup[] = [
   {
     id: 4,
     label: "Resources",
-    items: [{ id: "docs", title: "Docs", url: "/docs", icon: BookOpen, external: true }],
+    items: [{ id: "docs", title: "Docs", url: "/docs", icon: BookOpen, external: true, newTab: true }],
   },
 ]
