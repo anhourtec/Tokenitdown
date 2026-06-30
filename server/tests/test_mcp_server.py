@@ -5,7 +5,6 @@ Conversions run for real against MarkItDown so the wiring is verified end-to-end
 """
 
 import asyncio
-import base64
 
 import pytest
 from fastmcp import Client
@@ -75,27 +74,12 @@ def test_convert_file_oversize(tmp_path, monkeypatch):
         _run(_call(server, "convert_file_to_markdown", {"path": str(big)}))
 
 
-# --- uploaded document conversion (http mode) ----------------------------------
-
-def test_convert_document_base64():
-    payload = base64.b64encode(b"name,score\nAlice,1\n").decode()
-    md = _run(
-        _call(
-            build_server(http=True),
-            "convert_document",
-            {"content_base64": payload, "filename": "scores.csv"},
-        )
-    )
-    assert "Alice" in md
+# NOTE: in HTTP mode convert_url_to_markdown / convert_document proxy to the web
+# app's pipeline (forwarding the agent's key) — that path is unit-tested in
+# test_mcp_proxy.py with the network mocked. Here we only assert tool registration.
 
 
-def test_convert_document_rejects_bad_base64():
-    server = build_server(http=True)
-    with pytest.raises(ToolError, match="not valid base64"):
-        _run(_call(server, "convert_document", {"content_base64": "!!!not-base64!!!", "filename": "x.csv"}))
-
-
-# --- URL conversion / SSRF -----------------------------------------------------
+# --- URL conversion / SSRF (stdio, in-process) ---------------------------------
 
 def test_convert_url_blocks_internal_target():
     # Link-local metadata address is rejected before any network I/O.

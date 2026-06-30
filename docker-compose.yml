@@ -79,8 +79,15 @@ services:
     command: ["python", "-m", "app.mcp_server"]
     environment:
       TOKENITDOWN_MCP_HTTP: "1"
-      TOKENITDOWN_MCP_TOKEN: ${TOKENITDOWN_MCP_TOKEN:?set TOKENITDOWN_MCP_TOKEN in .env}
       TOKENITDOWN_MCP_PORT: "8001"
+      # Per-user API keys are validated against the web app (it owns the DB). The
+      # MCP server calls web's internal /api/mcp/verify over the compose network,
+      # authenticating with the shared service token.
+      TOKENITDOWN_WEB_URL: http://web:3000
+      MARKITDOWN_SERVICE_TOKEN: ${MARKITDOWN_SERVICE_TOKEN:?set MARKITDOWN_SERVICE_TOKEN in .env}
+      # Optional static admin token (escape hatch / smoke tests). Per-user keys are
+      # the normal path, so this can be left empty.
+      TOKENITDOWN_MCP_TOKEN: ${TOKENITDOWN_MCP_TOKEN:-}
       MAX_UPLOAD_BYTES: ${MAX_UPLOAD_BYTES:-52428800}
     ports:
       # Host port editors point at: http://<host>:${MCP_PORT}/mcp
