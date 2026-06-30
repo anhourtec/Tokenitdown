@@ -55,7 +55,7 @@ export interface NavGroup {
 
 /**
  * TokenItDown sidebar navigation. Routes beyond /dashboard are placeholders
- * (url "#") until those features are built — see PLAN.md.
+ * (url "#") until those features are built — see docs/PLAN.md.
  */
 export const sidebarItems: NavGroup[] = [
   {

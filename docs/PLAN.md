@@ -5,7 +5,7 @@
 **Status:** Planning / pre-build
 **Last updated:** 2026-06-29
 
-> **Note:** The current repository is scaffolded on **Next.js 15 / React 19**. This plan proposes Nuxt 3 / Vue 3 for the dashboard — confirm the final framework direction before building product UI. See `HANDOFF.md`.
+> **Note:** The current repository is scaffolded on **Next.js 15 / React 19**. This plan proposes Nuxt 3 / Vue 3 for the dashboard — confirm the final framework direction before building product UI.
 
 ---
 

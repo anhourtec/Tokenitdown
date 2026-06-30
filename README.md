@@ -35,6 +35,8 @@ Two deployment targets from one codebase:
 - **Postgres** — users, sessions, converted documents (tagged with the API key that created them), and API keys (Drizzle ORM). Keys are stored as SHA-256 hashes; the full token is shown once.
 - **Redis** — reserved for the job queue / session store.
 
+> Full details — every service, the request lifecycle, the MCP/agent flow, security boundaries, and the data model — are in **[docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md)**.
+
 ## Tech stack
 
 - [Next.js 15](https://nextjs.org/) (App Router) + [React 19](https://react.dev/)
@@ -99,6 +101,22 @@ The self-hosted edition ships as a `docker compose` bundle — **web + Postgres 
 ```
 
 This builds the images and brings the stack up; the web container waits for the processing service, ensures the database, and runs migrations on startup. App at `http://<host>:${WEB_PORT:-3030}`.
+
+## Documentation
+
+- **[docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md)** — services, request lifecycle, the MCP/agent integration, and the data model.
+- **[docs/PLAN.md](./docs/PLAN.md)** — product scope and roadmap.
+- **[docs/DESIGN.md](./docs/DESIGN.md)** — the visual system (colors and typography).
+
+## Contributing
+
+Contributions are welcome! See **[CONTRIBUTING.md](./CONTRIBUTING.md)** for how to set up the project, the conventions we follow, and how to open a good pull request — especially how to report **agent / MCP compatibility issues** (which agent, which transport, which install snippet). Check the [open issues](../../issues) for things to work on.
+
+Found a security vulnerability? Please report it privately rather than opening a public issue — see the [Security](./CONTRIBUTING.md#security) section.
+
+## Acknowledgements
+
+Conversion is powered by [Microsoft MarkItDown](https://github.com/microsoft/markitdown). TokenItDown is the workflow, quality control, RAG export, and agent integration around it.
 
 ## License
 
