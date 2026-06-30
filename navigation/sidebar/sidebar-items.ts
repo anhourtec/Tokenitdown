@@ -6,6 +6,7 @@ import {
   LayoutDashboard,
   type LucideIcon,
   Plug,
+  Plug2,
   Settings,
   Upload,
 } from "lucide-react"
@@ -86,6 +87,7 @@ export const sidebarItems: NavGroup[] = [
     label: "AI",
     items: [
       { id: "rag", title: "RAG Export", url: "/dashboard/rag", icon: Boxes },
+      { id: "connect", title: "Connect editor", url: "/dashboard/connect", icon: Plug2 },
       { id: "analytics", title: "Analytics", url: "/dashboard/analytics", icon: Gauge },
     ],
   },

@@ -202,6 +202,41 @@ export function AccountSkeleton() {
   )
 }
 
+/** Connect editor: editor-tab bar + code block, then tool list and host cards. */
+export function ConnectSkeleton() {
+  return (
+    <div className="flex max-w-3xl flex-col gap-4">
+      {/* Install card: tab row + code block */}
+      <div className="flex flex-col gap-4 rounded-xl border p-4">
+        <Skeleton className="h-5 w-40" />
+        <Skeleton className="h-3 w-72 max-w-full" />
+        <div className="flex gap-2">
+          {rows(4).map((_, i) => (
+            <Skeleton key={i} className="h-8 w-24" />
+          ))}
+        </div>
+        <Skeleton className="h-24 w-full rounded-lg" />
+      </div>
+      {/* Tools card */}
+      <div className="flex flex-col gap-3 rounded-xl border p-4">
+        <Skeleton className="h-5 w-44" />
+        {rows(3).map((_, i) => (
+          <div key={i} className="flex flex-col gap-1.5">
+            <Skeleton className="h-4 w-48" />
+            <Skeleton className="h-3 w-full max-w-lg" />
+          </div>
+        ))}
+      </div>
+      {/* Host-it card */}
+      <div className="flex flex-col gap-3 rounded-xl border p-4">
+        <Skeleton className="h-5 w-52" />
+        <Skeleton className="h-3 w-80 max-w-full" />
+        <Skeleton className="h-16 w-full rounded-lg" />
+      </div>
+    </div>
+  )
+}
+
 /** Convert: the dropzone / hub area. */
 export function ConvertSkeleton() {
   return (
