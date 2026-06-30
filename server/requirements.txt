@@ -7,3 +7,7 @@ fastapi==0.115.6
 uvicorn[standard]==0.34.0
 python-multipart==0.0.32
 requests==2.34.2
+# MCP server (app/mcp_server.py) — lets coding agents call TokenItDown directly.
+# Pinned to the 2.x line: 3.x requires starlette>=1.0.1, which conflicts with the
+# starlette<0.42 cap from fastapi above.
+fastmcp==2.13.0.2

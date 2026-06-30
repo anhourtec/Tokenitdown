@@ -41,6 +41,7 @@ storybook-static/
 # processing service (Python)
 server/vendor/
 server/.venv/
+server/.venv-mcp/
 **/__pycache__/
 server/.pytest_cache/
 *.pyc
