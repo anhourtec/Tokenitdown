@@ -1,4 +1,5 @@
 import {
+  BookOpen,
   Boxes,
   FileText,
   FolderOpen,
@@ -31,6 +32,9 @@ interface NavItemBase {
   badge?: NavBadge
   disabled?: boolean
   newTab?: boolean
+  /** Served by another app behind a rewrite (e.g. /docs) — render a plain
+   * anchor so the browser hard-navigates instead of Next client-routing. */
+  external?: boolean
   /** For parent items: expand the submenu by default. */
   defaultOpen?: boolean
 }
@@ -96,5 +100,10 @@ export const sidebarItems: NavGroup[] = [
       { id: "integrations", title: "Integrations", url: "#", icon: Plug, badge: "soon", disabled: true },
       { id: "settings", title: "Settings", url: "/dashboard/settings", icon: Settings },
     ],
+  },
+  {
+    id: 4,
+    label: "Resources",
+    items: [{ id: "docs", title: "Docs", url: "/docs", icon: BookOpen, external: true }],
   },
 ]
