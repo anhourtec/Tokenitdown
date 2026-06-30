@@ -48,3 +48,7 @@ server/.pytest_cache/
 
 # uploaded originals (local storage volume)
 /data/
+
+# local agent working files (not part of the public repo)
+HANDOFF.md
+CLAUDE.md
