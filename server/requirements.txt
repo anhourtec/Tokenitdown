@@ -12,4 +12,4 @@ requests==2.34.2
 # security advisories (SSRF/path-traversal, OAuth-proxy issues, command-injection,
 # and CVE-2025-66416 via mcp>=1.23) while still resolving under fastapi 0.115.6's
 # starlette<0.42 cap. 3.x would force starlette>=1.0.1, which conflicts with that.
-fastmcp==2.14.7
+fastmcp==3.4.2
