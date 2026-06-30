@@ -1,26 +1,51 @@
 version: 2
 updates:
+  # ---- Web app (npm) ----
   - package-ecosystem: npm
     directory: "/"
     schedule:
       interval: weekly
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 5
+    labels: ["dependencies", "javascript"]
     groups:
+      # One PR for all non-major npm updates; majors stay individual for review.
       npm-minor-and-patch:
         update-types: [minor, patch]
 
+  # ---- Processing service (pip) ----
   - package-ecosystem: pip
     directory: "/server"
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    labels: ["dependencies", "python"]
+    groups:
+      pip-minor-and-patch:
+        update-types: [minor, patch]
+    ignore:
+      # fastmcp is intentionally pinned to the 2.x line: 3.x forces
+      # starlette>=1.0.1 (conflicts with fastapi 0.115.6's <0.42 cap) and moves
+      # the auth APIs used by app/mcp_server.py and app/mcp_auth.py. Upgrading is
+      # a deliberate, tested change — don't let Dependabot open major PRs for it.
+      - dependency-name: fastmcp
+        update-types: [version-update:semver-major]
 
+  # ---- GitHub Actions (group everything into one PR; low risk) ----
   - package-ecosystem: github-actions
     directory: "/"
     schedule:
       interval: weekly
+    labels: ["dependencies", "github-actions"]
+    groups:
+      actions:
+        patterns: ["*"]
 
+  # ---- Dockerfile (group everything into one PR) ----
   - package-ecosystem: docker
     directory: "/server"
     schedule:
       interval: weekly
+    labels: ["dependencies", "docker"]
+    groups:
+      docker:
+        patterns: ["*"]
