@@ -1,5 +1,5 @@
 # TokenItDown processing service (MarkItDown wrapped in FastAPI).
-FROM python:3.13-slim-bookworm
+FROM python:3.14-slim-bookworm
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
