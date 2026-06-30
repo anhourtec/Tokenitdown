@@ -2,7 +2,6 @@ import {
   Boxes,
   FileText,
   FolderOpen,
-  Gauge,
   LayoutDashboard,
   type LucideIcon,
   Plug,
@@ -88,7 +87,6 @@ export const sidebarItems: NavGroup[] = [
     items: [
       { id: "rag", title: "RAG Export", url: "/dashboard/rag", icon: Boxes },
       { id: "connect", title: "Connect editor", url: "/dashboard/connect", icon: Plug2 },
-      { id: "analytics", title: "Analytics", url: "/dashboard/analytics", icon: Gauge },
     ],
   },
   {
