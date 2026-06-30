@@ -1,0 +1,86 @@
+---
+title: Contributing
+description: How to set up TokenItDown, the conventions we follow, and how to report agent / MCP compatibility issues.
+---
+
+import { Callout } from 'nextra/components'
+
+# Contributing
+
+Contributions are welcome. This page summarizes `CONTRIBUTING.md` in the repository; see it for the full
+detail.
+
+## Ways to contribute
+
+- **Report a bug** — open an issue with steps to reproduce, what you expected, and what happened. For
+  conversion bugs, include the source file/URL *type* (not a sensitive file itself) and the output you got.
+- **Report an agent / MCP compatibility issue** — tell us which agent or editor (Claude Code, Codex,
+  Cursor, Gemini, Windsurf, Cline, VS Code, …), the **transport** (stdio or hosted HTTP), and the **exact
+  install snippet** you used. The goal is to work with *every* agent, so these reports are especially
+  valuable.
+- **Propose a feature** — open an issue first so we can align on scope. See the [Roadmap](/roadmap).
+- **Send a pull request** — see below.
+
+## Development setup
+
+<Callout type="warning">
+  **The package manager is npm** — never pnpm or yarn. A better-auth peer dependency requires
+  `npm install --legacy-peer-deps`.
+</Callout>
+
+```bash
+npm install --legacy-peer-deps
+cp .env.example .env                      # fill in secrets
+docker compose up -d postgres redis markitdown
+npm run dev
+```
+
+The Python processing service lives in `server/`:
+
+```bash
+cd server && python3.12 -m venv .venv
+./.venv/bin/pip install -r requirements-dev.txt
+```
+
+See [Getting Started](/getting-started) and [Architecture](/architecture) for how the pieces fit together.
+
+## Conventions
+
+- **Imports** are absolute from the project root.
+- **Environment variables** go through `env.mjs` (typed + validated) — add new vars to its schema, never
+  read `process.env` directly in app code.
+- **Components** ship with a colocated test and, for UI primitives, a Storybook story.
+- **Every route gets a loading skeleton shaped like that page** — not a generic rectangle. Page-shaped
+  skeletons live in `components/ui/page-skeletons.tsx`.
+- **Stay narrow** — do what the change needs and finish it; no unrelated refactors, no leftover `TODO`s.
+
+## Tests — write one, run it
+
+Every change with testable behavior needs a test, and the suite must pass before you open a PR.
+
+```bash
+npx vitest run          # unit & integration (web)
+npm run e2e:headless    # end-to-end (Playwright)
+npm run typecheck       # tsc, strict
+npm run lint            # ESLint
+cd server && ./.venv/bin/python -m pytest    # processing service + MCP
+```
+
+For UI changes, verify the rendered result in a real browser.
+
+## Pull requests
+
+1. Branch off `main`.
+2. Keep each PR focused on a single topic; split unrelated work into separate PRs.
+3. Make sure `typecheck`, `lint`, and the test suites pass.
+4. Write clear commit messages following [Conventional Commits](https://www.conventionalcommits.org/)
+   (`feat:`, `fix:`, `docs:`, `refactor:`, …) and describe the *why* in the PR body.
+5. Update docs (`README.md`, `docs/`) when behavior or setup changes.
+
+## Security
+
+Found a vulnerability? **Please don't open a public issue.** Email the maintainers at
+`security@anhourtec.com` (or use GitHub's private security advisory) and give a reasonable window to ship a
+fix before disclosure.
+
+By contributing, you agree your contributions are licensed under the project's MIT License.

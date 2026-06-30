@@ -1,0 +1,153 @@
+---
+title: API Reference
+description: The TokenItDown HTTP API — convert, keys, MCP verify, agent files, and health.
+---
+
+import { Callout } from 'nextra/components'
+
+# API Reference
+
+All routes are App Router handlers under `app/api/*`, served by the **web** service. Two kinds of caller
+are supported:
+
+- **Session** — a logged-in dashboard user (httpOnly cookie set by better-auth).
+- **API key** — an agent presenting `Authorization: Bearer tid_…`. Convert routes accept either; the rest
+  are session-only (or internal).
+
+<Callout type="info">
+  On the convert routes, when a valid Bearer key is presented its owner becomes the actor and the created
+  document is tagged with that key. If a Bearer key is presented but **invalid**, the request is rejected —
+  it does **not** fall back to the session.
+</Callout>
+
+## Conversion
+
+### `POST /api/convert`
+
+Convert an uploaded file. **Auth:** session **or** `Authorization: Bearer tid_…`.
+
+**Request** — `multipart/form-data`:
+
+| Field | Type | Notes |
+|---|---|---|
+| `file` | File | Required, non-empty, ≤ `MAX_UPLOAD_BYTES` (default 50 MB). |
+| `tier` | string | Optional — `clean` or `compact`. Defaults to the user's saved tier. |
+
+**Response** — `200`:
+
+```json
+{
+  "id": "…",
+  "title": "…",
+  "markdown": "# Cleaned Markdown…",
+  "tokens": { "rawTokens": 5120, "cleanTokens": 3180, "saved": 1940, "pct": 37.9, "exact": true },
+  "cleanStats": { "headingsPromoted": 2, "tablesNormalized": 1, "...": 0 }
+}
+```
+
+**Errors:** `400` (no/empty file or not multipart), `401` (unauthorized), `413` (over the size limit),
+`5xx` (conversion failure — surfaces the converter's status and message).
+
+### `POST /api/convert/url`
+
+Convert a web page or YouTube URL. **Auth:** session **or** `Authorization: Bearer tid_…`.
+
+**Request** — JSON:
+
+```json
+{ "url": "https://example.com/article", "tier": "clean" }
+```
+
+`tier` is optional (`clean` | `compact`). Web sources also get nav/footer/cookie chrome stripped during
+cleaning.
+
+**Response** — same shape as `POST /api/convert`. **Errors:** `400` (missing `url`), `401`, `5xx`
+(conversion failure; SSRF-rejected URLs surface a user-safe message).
+
+## API keys
+
+### `GET /api/keys`
+
+List the session user's active keys, each with usage. **Auth:** session.
+
+```json
+{
+  "keys": [
+    {
+      "id": "…", "name": "laptop", "masked": "tid_…a1b2",
+      "createdAt": "…", "lastUsedAt": "…",
+      "calls": 14, "tokensSaved": 28110
+    }
+  ]
+}
+```
+
+### `POST /api/keys`
+
+Create a key. **Auth:** session. Body: `{ "name": "laptop" }` (required, ≤ 60 chars).
+
+**Response** — `201`. The `token` is returned **exactly once**:
+
+```json
+{ "token": "tid_XXXXXXXXXXXXXXXXXXXX", "key": { "id": "…", "name": "laptop", "masked": "tid_…a1b2", "createdAt": "…", "lastUsedAt": null } }
+```
+
+`400` if the name is missing or too long.
+
+### `GET /api/keys/[id]`
+
+List recent conversions performed by one key (newest first). **Auth:** session.
+
+```json
+{
+  "conversions": [
+    { "id": "…", "title": "…", "sourceType": "url", "sourceName": "https://…", "rawTokens": 5120, "cleanTokens": 3180, "createdAt": "…" }
+  ]
+}
+```
+
+### `DELETE /api/keys/[id]`
+
+Revoke a key the user owns (sets `revokedAt`; the row is kept). **Auth:** session. Returns
+`{ "ok": true }`, or `404` if no matching active key.
+
+## RAG export
+
+### `GET /api/documents/[id]/chunks`
+
+Return the document's Markdown chunked by heading, with token counts. **Auth:** session.
+
+**Query:** `level` — `auto` (default), `1`, `2`, or `3`. See [RAG Export](/rag-export).
+
+```json
+{
+  "id": "…", "title": "…", "maxLevel": 2, "auto": true,
+  "chunks": [{ "index": 0, "heading": "Introduction", "text": "…", "tokens": 412 }]
+}
+```
+
+`404` if the document isn't found for the user.
+
+## Internal
+
+### `POST /api/mcp/verify`
+
+**Internal — not for browser use.** Used by the Python MCP server to validate a presented per-user API key.
+**Auth:** `X-Service-Token` header matching `MARKITDOWN_SERVICE_TOKEN` (constant-time compared).
+
+Body `{ "key": "tid_…" }` → `200 { "userId": "…" }` on success; `401` if the service token or the key is
+invalid; `400` if the key is missing.
+
+### `GET /api/agent-files/[name]`
+
+Download a per-instance agent instruction file. **Auth:** session. `name` is one of `AGENTS.md`,
+`CLAUDE.md`, `skills.md`. Returns the generated Markdown as a `text/markdown` attachment (with this
+instance's origin + hosted MCP endpoint baked in), or `404` for an unknown name. See
+[Drop-in Agent Files](/agents/drop-in-files).
+
+## Health
+
+### `GET /api/health`
+
+Liveness probe. Returns `{ "status": "ok" }`. Aliased to `/healthz`, `/health`, and `/ping` via
+`next.config.ts`.

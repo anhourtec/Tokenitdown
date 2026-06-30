@@ -11,6 +11,8 @@ const eslintIgnore = [
   ".git/",
   ".next/",
   "node_modules/",
+  // Documentation site (Nextra) — self-contained app with its own lint/build.
+  "docs/",
   "dist/",
   "build/",
   "coverage/",

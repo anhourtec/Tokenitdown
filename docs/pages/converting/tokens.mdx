@@ -1,0 +1,48 @@
+---
+title: Token Counting
+description: How TokenItDown measures the tokens saved by cleaning — the metric behind the name.
+---
+
+import { Callout } from 'nextra/components'
+
+# Token Counting
+
+Token metering is the measurement behind the "TokenItDown" promise: every conversion reports how many
+tokens cleaning removed.
+
+## A real tokenizer, not a guess
+
+Counts come from a **real GPT BPE tokenizer** (`gpt-tokenizer`), so they match what an LLM actually sees —
+the same kind of encoding the OpenAI tokenizer tool shows, rather than a `chars / 4` estimate. It runs
+**server-side only** (in the convert routes), so the tokenizer tables never ship to the browser. If
+encoding ever fails, a char/word heuristic (`~100 tokens ≈ 75 words`, with a character floor for dense
+markup) is the fallback.
+
+<Callout type="info">
+  The result includes an `exact` flag — `true` when counts came from the real tokenizer, `false` when the
+  heuristic fallback was used.
+</Callout>
+
+## The savings shape
+
+For each conversion the pipeline computes a `TokenSavings`:
+
+```ts
+interface TokenSavings {
+  rawTokens: number    // tokens in the raw engine output
+  cleanTokens: number  // tokens after cleaning
+  saved: number        // rawTokens - cleanTokens, never negative
+  pct: number          // percentage saved, 0–100, one decimal
+  exact: boolean       // true when a real tokenizer produced the counts
+}
+```
+
+`rawTokens` and `cleanTokens` are stored on the `document` row, so totals roll up across your whole
+Library and across each API key. The dashboard surfaces both the **total tokens saved** and the **percent
+reduction** across all conversions; the per-key transparency view shows tokens saved per agent key.
+
+## Why it matters
+
+Agents and RAG pipelines pay per token of context. Feeding an LLM cleaned Markdown instead of raw extractor
+output — or instead of raw HTML — measurably shrinks the context, and pulling **pre-converted** Markdown
+means an agent doesn't re-parse the same raw file on every call.

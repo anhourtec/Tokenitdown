@@ -1,0 +1,77 @@
+---
+title: API Keys & Transparency
+description: Per-user API keys for agent access — how they're created, stored, validated, and how the per-key transparency view works.
+---
+
+import { Callout, Steps } from 'nextra/components'
+
+# API Keys & Transparency
+
+Hosted (HTTP) MCP access and programmatic API access both authenticate with **per-user API keys**, minted
+and revoked from the dashboard. They're the foundation of TokenItDown's transparency model.
+
+## Creating and revoking keys
+
+<Steps>
+
+### Create a key
+
+On the dashboard's **Connect editor** page (`/dashboard/connect`), create a named key (e.g. "laptop" or
+"CI"). The full token is shown **exactly once** — copy it immediately; it can never be retrieved again.
+
+### Use it
+
+Pass it as a Bearer token to the hosted MCP endpoint or the convert API:
+
+```
+Authorization: Bearer tid_XXXXXXXXXXXXXXXXXXXXXXXX
+```
+
+### Revoke it
+
+Revoking sets `revokedAt` on the key. The row is **kept for audit** (keys are revoked, never hard-deleted),
+and any conversions it made remain attributed to it.
+
+</Steps>
+
+## The `tid_` token format
+
+A token looks like `tid_<base64url secret>` — the `tid_` prefix plus 24 random bytes encoded as base64url.
+The high-entropy random secret is why a plain hash is the right primitive (unlike passwords, no salt or
+bcrypt is needed).
+
+## How keys are stored
+
+<Callout type="info">
+  The full token is **never stored.** Only its **SHA-256 hash** (the lookup key, unique-indexed) and the
+  **last four characters** of the secret (for the masked display `tid_…abcd`) are persisted on the
+  `api_key` row, along with `createdAt`, `lastUsedAt`, and `revokedAt`.
+</Callout>
+
+Validation hashes the presented token and looks up the non-revoked row by hash, touching `lastUsedAt` on
+success. The hosted MCP server is **stateless** — it doesn't touch the database. Instead it POSTs the
+presented token to the web app's internal `POST /api/mcp/verify` endpoint (authenticated with the shared
+`MARKITDOWN_SERVICE_TOKEN`, constant-time compared), which returns the owning `userId` on success.
+
+```text
+agent ──Bearer tid_…──► markitdown-mcp ──X-Service-Token + {key}──► web /api/mcp/verify ──► { userId }
+```
+
+## The per-key transparency view
+
+Because HTTP-mode conversions proxy through the web pipeline, every document an agent creates is tagged
+with the key's `apiKeyId`. The dashboard rolls that up per key:
+
+- **Calls** — the number of conversions the key (agent) performed.
+- **Tokens saved** — total `rawTokens − cleanTokens` across the key's conversions.
+- **What it converted** — the recent list of documents (title, source type/name, token counts, timestamp)
+  the key created.
+
+This means you can hand an agent a key and later see **exactly** what it read on your behalf, and how many
+tokens that saved — full attribution, no black box.
+
+## Static admin token (escape hatch)
+
+For smoke tests or a single-tenant box without accounts, the HTTP server also accepts an optional static
+`TOKENITDOWN_MCP_TOKEN` (constant-time compared). It's not the normal path — per-user keys are — and it's
+not attributed to any user. Leave it empty to rely only on per-user keys.

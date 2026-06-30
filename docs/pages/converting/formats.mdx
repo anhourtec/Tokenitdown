@@ -1,0 +1,45 @@
+---
+title: Supported Formats
+description: Every source type TokenItDown can convert to Markdown, via Microsoft MarkItDown.
+---
+
+import { Callout } from 'nextra/components'
+
+# Supported Formats
+
+Conversion is powered by [Microsoft MarkItDown](https://github.com/microsoft/markitdown) (`markitdown[all]`),
+which TokenItDown installs from PyPI. The following inputs are supported.
+
+| Source | Notes |
+|---|---|
+| **PDF** | Native/digital PDFs extract text and structure to Markdown. |
+| **Word (`.docx`)** | Headings, lists, tables, and inline formatting preserved. |
+| **PowerPoint (`.pptx`)** | Slide text and structure extracted per slide. |
+| **Excel (`.xlsx`)** | Sheets rendered as Markdown tables. |
+| **Images** | EXIF metadata extraction **and OCR** for embedded text. |
+| **Audio** | EXIF metadata **and transcription** (the image installs `ffmpeg` + `exiftool`). |
+| **HTML** | Page content converted to Markdown. |
+| **Data: CSV / JSON / XML** | Tabular and structured data rendered to Markdown. |
+| **ZIP** | Archive is iterated and its contents converted. |
+| **EPUB** | E-book text extracted to Markdown. |
+| **Outlook (`.msg`)** | Email messages converted. |
+| **URLs** | Web pages, articles, docs pages, Wikipedia, RSS feeds, and links to PDF/Office files. |
+| **YouTube URLs** | Returns the video transcript. |
+
+<Callout type="info">
+  **Two source types are persisted:** `file` (an uploaded document — the original is stored on disk) and
+  `url` (a web page or YouTube link — no original file is stored). URL conversions additionally have
+  nav/footer/cookie chrome stripped during cleaning.
+</Callout>
+
+## SSRF protection for URLs
+
+URL conversion validates the target and **re-validates every redirect hop**, rejecting non-`http(s)`
+schemes and any host that resolves to a private, loopback, link-local (including the cloud metadata address
+`169.254.169.254`), multicast, or reserved address. See `server/app/security.py`.
+
+## Engine roadmap
+
+Today the fast path (MarkItDown) handles all inputs. The [roadmap](/roadmap) proposes a tiered pipeline —
+adding Docling for table-heavy/academic layouts, Marker for math and messy scans, and an AI-OCR path for
+handwriting and degraded scans — with auto-routing and a user override.

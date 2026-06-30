@@ -1,0 +1,78 @@
+---
+title: Configuration
+description: Every environment variable TokenItDown reads, what it's for, and whether it's required.
+---
+
+import { Callout } from 'nextra/components'
+
+# Configuration
+
+All web-app environment variables are typed and validated through `env.mjs` ([T3 Env](https://env.t3.gg/)
++ Zod). Invalid or missing required values **fail fast** at build/boot. Add new variables to that schema
+— never read `process.env` directly in app code.
+
+<Callout type="info">
+  Copy `.env.example` to `.env` and fill it in. The same `.env` is read by Next.js, by `docker-compose.yml`
+  (for `POSTGRES_*` / `REDIS_PASSWORD`), and by the `db:*` npm scripts and drizzle-kit.
+</Callout>
+
+## Web app
+
+| Variable | Required | Default | Purpose |
+|---|---|---|---|
+| `DATABASE_URL` | ✅ | — | PostgreSQL connection string used by Drizzle and better-auth. Inside compose the web container overrides this to `postgres:5432`. |
+| `BETTER_AUTH_SECRET` | ✅ | — | Secret better-auth uses to sign session cookies/tokens. Must be ≥ 32 chars. Generate: `openssl rand -base64 32`. |
+| `BETTER_AUTH_URL` | ✅ | — | The app's one canonical public URL (a single URL, not a list). Used for callbacks and the session cookie; an `https` value makes cookies `Secure`. Keep its port in sync with `WEB_PORT`. |
+| `MARKITDOWN_SERVICE_TOKEN` | ✅ | — | Shared secret sent as `X-Service-Token` to the converter and used to authenticate `/api/mcp/verify`. Must be ≥ 16 chars and **match** the converter's value. Generate: `openssl rand -base64 24`. |
+| `MARKITDOWN_SERVICE_URL` | — | `http://localhost:8000` | Base URL of the internal converter. Inside compose this is `http://markitdown:8000`. |
+| `REDIS_URL` | — | — | Redis connection string. Reserved for the job queue / future session store (sessions live in Postgres today). |
+| `TRUSTED_ORIGINS` | — | — | Extra comma-separated origins allowed by better-auth (CSRF / trusted origins) beyond `BETTER_AUTH_URL`. In dev the LAN URL is auto-added. |
+| `STORAGE_DIR` | — | `./data/uploads` | Directory where original uploads are stored (per-user subfolders). A mounted volume in Docker (`/data/uploads`). |
+| `MAX_UPLOAD_BYTES` | — | `52428800` (50 MB) | Max upload size accepted by the convert API, in bytes. |
+| `NEXT_PUBLIC_BETTER_AUTH_URL` | — | current origin | Base URL the browser auth client talks to. Only set if the browser must call a different origin than the page it's served from (rare). |
+| `ANALYZE` | — | `false` | Enable the Next.js bundle analyzer during `npm run build` (`"true"` / `"false"`). |
+| `SKIP_ENV_VALIDATION` | — | unset | Skip env validation (used in CI builds). Leave unset locally. |
+
+## MCP server
+
+The `markitdown-mcp` container reads these. Per-user API keys are the normal auth path; the admin token is
+an optional escape hatch.
+
+| Variable | Required | Default | Purpose |
+|---|---|---|---|
+| `TOKENITDOWN_MCP_HTTP` | — | unset | `1` → streamable-HTTP (hosted) mode; otherwise stdio. |
+| `TOKENITDOWN_WEB_URL` | HTTP mode | — | The web app's base URL — required in HTTP mode for key validation and the convert proxy. In compose: `http://web:3000`. |
+| `MARKITDOWN_SERVICE_TOKEN` | HTTP mode | — | Shared secret used to call the web app's internal `/api/mcp/verify`. |
+| `TOKENITDOWN_MCP_TOKEN` | — | empty | Optional static **admin** token (escape hatch / smoke tests). Leave empty to rely only on per-user keys. Generate: `openssl rand -base64 24`. |
+| `TOKENITDOWN_MCP_HOST` | — | `0.0.0.0` | HTTP bind host. |
+| `TOKENITDOWN_MCP_PORT` | — | `8001` | HTTP bind port (container). |
+| `MCP_PORT` | — | `8001` | Host port the MCP server is published on (compose maps it to container `8001`). |
+
+<Callout type="warning">
+  An HTTP-mode MCP server with **no** auth is an open conversion proxy, so the server refuses to start in
+  HTTP mode unless either per-user key validation (`TOKENITDOWN_WEB_URL` + `MARKITDOWN_SERVICE_TOKEN`)
+  and/or a static `TOKENITDOWN_MCP_TOKEN` is configured.
+</Callout>
+
+## Converter service
+
+The Python converter (`server/`) reads a small set of its own variables:
+
+| Variable | Required | Default | Purpose |
+|---|---|---|---|
+| `MARKITDOWN_SERVICE_TOKEN` | ✅ | — | Shared secret required on every `/convert*` call (constant-time compared). |
+| `MAX_UPLOAD_BYTES` | — | `52428800` | Max upload size; larger uploads return `413`. |
+
+## Docker Compose credentials
+
+`docker-compose.yml` provisions Postgres and sets the Redis password from these. Keep them in sync with
+`DATABASE_URL` / `REDIS_URL`.
+
+| Variable | Required | Default | Purpose |
+|---|---|---|---|
+| `POSTGRES_USER` | — | `tokenitdown` | Postgres user provisioned in the container. |
+| `POSTGRES_PASSWORD` | ✅ | — | Postgres password (compose fails if unset). |
+| `POSTGRES_DB` | — | `tokenitdown` | Database name. |
+| `REDIS_PASSWORD` | ✅ | — | Redis password (Redis 7 requires it for non-loopback clients). |
+| `WEB_PORT` | — | `3030` | Host port the web container is published on. Must match the port in `BETTER_AUTH_URL`. |
+| `DB_SSL` | — | `false` | Disable TLS for a LAN Postgres; set `true` for a TLS-only server. |

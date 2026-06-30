@@ -1,0 +1,45 @@
+---
+title: Converting Documents
+description: How TokenItDown turns files and URLs into cleaned, token-counted Markdown — the pipeline, the per-format pages, and what happens to each conversion.
+---
+
+import { Callout, Cards } from 'nextra/components'
+
+# Converting Documents
+
+Every conversion — whether it comes from the dashboard or an AI agent — runs through the same pipeline, so
+the output is consistent, cleaned, token-counted, and saved to your Library.
+
+## The pipeline
+
+1. **Convert** — the web app proxies the file or URL to the internal **markitdown** service
+   (`POST /convert` or `/convert-url`), which wraps `markitdown[all]`. Uploads use the narrowest
+   `convert_stream` API (no filesystem or network access); URLs are SSRF-guarded.
+2. **Clean** — the raw engine output runs through a deterministic normalization pass
+   (`lib/markdown/clean.ts`). Web sources additionally get nav/footer/cookie chrome stripped.
+3. **Count tokens** — a real GPT BPE tokenizer counts tokens before and after cleaning, producing the
+   **tokens saved** metric.
+4. **Persist** — the original is written to disk (`STORAGE_DIR`) and a `document` row is inserted with the
+   raw + cleaned Markdown, token counts, the cleaning tier, per-transform clean stats, and the API key
+   that created it (or null for dashboard conversions).
+
+## Per-format convert pages
+
+The dashboard exposes a dedicated page per source type, each with drag-and-drop batch upload, a
+document-scan animation while converting, and a GitHub-style rendered result:
+
+Md PDF · Md Docs · Md PPTX · Md Excel · Md Image · Md Audio · Md HTML · Md Data (CSV/JSON/XML) · Md ZIP ·
+Md EPUB · Md URL.
+
+<Callout type="info">
+  The size limit is `MAX_UPLOAD_BYTES` (default **50 MB**). Larger uploads are rejected with `413` by both
+  the web convert route and the converter.
+</Callout>
+
+## Read more
+
+<Cards>
+  <Cards.Card title="Supported Formats" href="/converting/formats" />
+  <Cards.Card title="Cleaning Tiers" href="/converting/cleaning" />
+  <Cards.Card title="Token Counting" href="/converting/tokens" />
+</Cards>

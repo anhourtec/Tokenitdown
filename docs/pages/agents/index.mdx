@@ -1,0 +1,64 @@
+---
+title: AI Agents (MCP)
+description: TokenItDown ships a Model Context Protocol server so any coding agent can convert files and URLs to clean Markdown automatically.
+---
+
+import { Callout, Cards } from 'nextra/components'
+
+# AI Agents (MCP)
+
+This is the flagship integration. TokenItDown ships a built-in
+[Model Context Protocol](https://modelcontextprotocol.io) (MCP) server
+(`server/app/mcp_server.py`, built on [FastMCP](https://github.com/jlowin/fastmcp)) so a developer's agent
+— Claude Code, Cursor, VS Code Copilot, Claude Desktop, Codex, Gemini, Windsurf, Cline, Aider, or any MCP
+host — calls TokenItDown **automatically** the moment the user points it at a file or a URL. The agent
+gets back clean, LLM-ready Markdown instead of raw bytes or HTML.
+
+## Two run modes
+
+The same server runs in two modes, chosen by the `TOKENITDOWN_MCP_HTTP` environment variable. The
+conversion logic is shared with the HTTP API via `server/app/conversion.py` — one security-reviewed path.
+
+| Mode | For | Tools exposed | Auth | Conversion |
+|---|---|---|---|---|
+| **stdio** *(default)* | Local editors; the user's own machine | `convert_url_to_markdown`, `convert_file_to_markdown` | None (local subprocess) | In-process — reads local files directly, no upload, no account |
+| **streamable HTTP** | Hosted / self-hosted; remote agents | `convert_url_to_markdown`, `convert_document` (base64 upload) | Per-user API key (Bearer) and/or optional static admin token | **Proxied through the web app's pipeline** |
+
+## The transparency model
+
+This is what makes the hosted mode special. In HTTP mode the server doesn't convert in-process — it
+**proxies each conversion back through the web app's convert pipeline**, forwarding the agent's API key. So
+an agent's conversion is:
+
+- **Cleaned and token-counted** — exactly like a dashboard conversion.
+- **Saved to the user's Library** — it shows up alongside everything else.
+- **Attributed to the key** — the document is tagged with `apiKeyId`, which powers the dashboard's per-key
+  view: how many calls each key made, tokens saved, and exactly what it converted.
+
+<Callout type="info">
+  Because the agent and the dashboard go through the same pipeline, there's no separate "agent output" —
+  what your agent sees is identical to what you'd get in the UI, and you can audit every agent conversion
+  after the fact.
+</Callout>
+
+## Security boundary
+
+The local-filesystem tool (`convert_file_to_markdown`, which reads a server-side path) is registered
+**only** in stdio mode — on the user's own machine. Over HTTP, where a `path` argument would be an
+arbitrary server-side file read, callers instead send the document's bytes as base64 via
+`convert_document`. URL conversion is SSRF-guarded in both modes.
+
+<Callout type="warning">
+  An HTTP-mode MCP server **must** be authenticated. The server refuses to start in HTTP mode unless
+  per-user key validation and/or a static admin token is configured — an unauthenticated HTTP MCP server
+  is an open conversion proxy.
+</Callout>
+
+## Where to go next
+
+<Cards>
+  <Cards.Card title="Install in your editor" href="/agents/install" />
+  <Cards.Card title="The tools" href="/agents/tools" />
+  <Cards.Card title="API keys & transparency" href="/agents/api-keys" />
+  <Cards.Card title="Drop-in agent files" href="/agents/drop-in-files" />
+</Cards>

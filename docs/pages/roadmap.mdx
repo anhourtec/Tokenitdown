@@ -1,0 +1,87 @@
+---
+title: Roadmap
+description: What's shipped in TokenItDown today and where it's headed — the tiered engine, the launch heroes, agents, and the self-hosted edition.
+---
+
+import { Callout } from 'nextra/components'
+
+# Roadmap
+
+TokenItDown's value is the workflow around conversion — the library, the cleaning pass, the RAG export, the
+token economics, and the agent integration. This page frames what's **shipped today** and what's **planned**,
+distilled from the internal product plan.
+
+<Callout type="info">
+  Functionality is the priority; the phases below are a suggested build order, not a hard gate — launch
+  heroes can be pulled forward for an earlier release.
+</Callout>
+
+## Shipped today
+
+- **Convert anything to Markdown** — PDF, Word, PowerPoint, Excel, images (OCR + EXIF), audio
+  (transcription), HTML, CSV/JSON/XML, ZIP, EPUB, and URL / YouTube, via MarkItDown.
+- **Deterministic cleaning pass** with three tiers (`raw` / `clean` / `compact`) and reported per-transform
+  stats.
+- **Token metering** with a real GPT BPE tokenizer — tokens saved per conversion and across the Library.
+- **Library + Documents** — cleaned Markdown (Preview / Raw) and original files (Original / Markdown).
+- **RAG export** — heading-aware chunking with auto-detected levels and exact token counts.
+- **Native agent access (MCP)** — stdio + hosted HTTP, three conversion tools, with the HTTP mode proxying
+  through the web pipeline.
+- **Per-user API keys + transparency** — hashed keys, per-key call counts, tokens saved, and conversion
+  history.
+- **Drop-in agent files** — per-instance `AGENTS.md` / `CLAUDE.md` / `skills.md`.
+- **Auth** — email/password with httpOnly cookie sessions, CSRF via trusted origins, a protected dashboard.
+
+## Planned
+
+### Tiered conversion engine
+
+A routed pipeline so most documents take the fast path and only the hard ones pay for heavy engines:
+
+- **Fast path** — MarkItDown / PyMuPDF4LLM for native PDFs and Office files.
+- **Structure path** — Docling for table-heavy, multi-column, and academic layouts.
+- **High-fidelity path** — Marker for math/equations and messy scans.
+- **High-accuracy AI-OCR path** — a vision-LLM / OCR engine for handwriting and degraded scans.
+- **Auto-routing** with a user override to force an engine.
+
+### Launch heroes
+
+1. **Visual confidence + one-click AI repair** — render the original beside the Markdown, flag
+   low-confidence regions, and re-run only a flagged span through a stronger engine.
+2. **PDF → RAG-ready in one click** — chunk, count, embed, and export straight to JSONL / LangChain /
+   LlamaIndex / a vector DB.
+3. **Token-budget / context compressor** — AI pruning that strips boilerplate and reports tokens saved.
+
+### Beyond the heroes
+
+- **AI table rebuilder**, **schema extraction UI**, **inline figure/diagram descriptions**, **auto
+  tag & categorize**, and **multi-doc chat across the corpus** with citations.
+- **Chrome extension** — capture a page as an agent-consumable context bundle (`page.md`, accessibility-tree
+  snapshot, screenshot, optional network log) pushed into your Library.
+- **Library automation** — folders/tags/search, versioning + re-convert diff, watch-folder + webhooks, and
+  export targets (Obsidian, Notion, GitHub) with a front-matter toggle.
+- **More MCP tools** — list documents, fetch Markdown by id, search the library, fetch a context bundle.
+- **CLI** — `tokenitdown convert <file>` over the REST API.
+- **Self-hosted edition polish** — fully offline / local-LLM (Ollama) mode, plus 2FA, session rotation,
+  rate limiting, and an audit log.
+
+## Cloud vs self-hosted
+
+| Capability | Cloud | Self-hosted |
+|---|:---:|:---:|
+| Tiered conversion engine | ✅ managed | ✅ local |
+| Dashboard + editor + viewer | ✅ | ✅ |
+| AI repair / RAG export / compressor | ✅ | ✅ (own LLM keys or Ollama) |
+| Chrome extension | ✅ | ✅ (points at local instance) |
+| MCP server + REST API | ✅ hosted endpoint | ✅ local endpoint |
+| Local-LLM / fully-offline mode | — | ✅ |
+| Billing / teams / SSO | ✅ | self-managed |
+
+**Positioning pillar for self-hosting:** *100% local — your keys, your data.*
+
+## Open decisions
+
+- Default embedding model (local vs hosted) for RAG-ready export.
+- Marker GPU/licensing — optional add-on engine vs default high-fidelity path.
+- Which source connectors ship first for watch-folder (NAS / Drive / S3).
+- Pricing model and the open-source posture for the self-hosted edition.

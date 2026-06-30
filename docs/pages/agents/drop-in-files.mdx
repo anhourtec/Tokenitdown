@@ -1,0 +1,51 @@
+---
+title: Drop-in Agent Files
+description: Downloadable AGENTS.md / CLAUDE.md / skills.md files, generated per-instance, that teach any agent to use TokenItDown.
+---
+
+import { Callout } from 'nextra/components'
+
+# Drop-in Agent Files
+
+Not every agent reads MCP server instructions the same way, and some need a nudge to use a tool at all. So
+TokenItDown generates **drop-in instruction files** you download and add to your own repository. Any AI
+coding agent that reads them — Claude Code, Codex, Cursor, Gemini, Windsurf, Cline, Aider, or any MCP host
+— then knows to call TokenItDown whenever it's handed a file or URL.
+
+## The three files
+
+| File | For | What it is |
+|---|---|---|
+| **`AGENTS.md`** | Codex, Cursor, Gemini, Windsurf, and most MCP-aware agents | The cross-agent standard, read by most agents. |
+| **`CLAUDE.md`** | Claude Code | Claude Code's project-memory file, loaded at the start of every session. |
+| **`skills.md`** | Skill runners / MCP hosts | A skill-style description any host or CLI can point at. |
+
+Each is downloadable from the dashboard's **Connect editor** page (and viewable inline, GitHub-style)
+via `GET /api/agent-files/[name]`.
+
+## Generated per-instance
+
+<Callout type="info">
+  The files are generated **per deployment**, so they carry this instance's dashboard origin and hosted MCP
+  endpoint baked in. The MCP URL is derived from `BETTER_AUTH_URL` as
+  `<protocol>//<hostname>:8001/mcp`. There's nothing to hand-edit — download and commit.
+</Callout>
+
+## What's in them
+
+Each file contains the same core guidance, framed for its audience:
+
+- **When to use TokenItDown** — call a tool whenever the user references a document or web page to read,
+  summarize, quote, search, compare, or extract from. Don't guess a binary file's contents from its name,
+  and don't paste raw HTML into context — convert it first.
+- **The tools** — `convert_url_to_markdown(url)`, `convert_file_to_markdown(path)` (local/stdio), and
+  `convert_document(content_base64, filename)` (hosted/HTTP).
+- **Setup** — both the local (stdio) snippets and the hosted (HTTP) snippet, the latter pointing at this
+  instance's endpoint with a `Bearer YOUR_TOKENITDOWN_API_KEY` header and a note that every keyed
+  conversion is tracked in the dashboard.
+
+## Why this matters
+
+The goal is to work with **every** agent, not just Claude. MCP gets you the tools; the drop-in files get an
+arbitrary agent to actually reach for them. Together they make "my agent reads the `.md` directly" true
+across the ecosystem.
