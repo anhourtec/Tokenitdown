@@ -17,7 +17,7 @@ export function CodeTabs({ tabs }: { tabs: CodeTab[] }) {
   if (!tab) return null
 
   return (
-    <div className="overflow-hidden rounded-xl border border-border bg-card">
+    <div className="min-w-0 overflow-hidden rounded-xl border border-border bg-card">
       <div className="flex items-center justify-between gap-2 border-b border-border bg-muted/40 pr-2">
         <div className="flex" role="tablist" aria-label="Package manager">
           {tabs.map((t, i) => (

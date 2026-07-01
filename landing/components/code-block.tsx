@@ -14,7 +14,7 @@ export function CodeBlock({
   copy?: boolean
 }) {
   return (
-    <div className={cn("overflow-hidden rounded-xl border border-border bg-card", className)}>
+    <div className={cn("min-w-0 overflow-hidden rounded-xl border border-border bg-card", className)}>
       {(label || copy) && (
         <div className="flex items-center justify-between gap-2 border-b border-border bg-muted/40 px-3 py-1.5">
           <span className="font-mono text-xs text-muted-foreground">{label}</span>

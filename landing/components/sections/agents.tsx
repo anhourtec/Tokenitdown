@@ -27,7 +27,7 @@ export function Agents() {
   return (
     <Section id="agents" eyebrow={data.eyebrow} title={data.title} lede={data.lede} bordered>
       <div className="mx-auto mt-14 grid max-w-5xl gap-6 text-left lg:grid-cols-2">
-        <Reveal className="flex flex-col gap-8">
+        <Reveal className="flex min-w-0 flex-col gap-8">
           <div>
             <Label>{data.install.title}</Label>
             <CodeTabs tabs={data.install.managers} />
@@ -43,7 +43,7 @@ export function Agents() {
           </div>
         </Reveal>
 
-        <Reveal delay={0.08} className="flex flex-col gap-8">
+        <Reveal delay={0.08} className="flex min-w-0 flex-col gap-8">
           <div>
             <Label>{data.mcp.title}</Label>
             <div className="flex flex-col gap-3">
