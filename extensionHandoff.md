@@ -1,7 +1,67 @@
 # Extension Handoff
 
-**Updated:** 2026-06-27 (M1–M5 + path fix + Readability coverage fix shipped & pushed; `main`
-merged in; **"Save to TokenItDown" platform-save built — uncommitted**)
+**Updated:** 2026-06-30 (see **"Direction change: retire M1–M5, use the portal engine"** at the
+top — decision pending). Prior: M1–M5 + path fix + Readability coverage fix shipped & pushed;
+`main` merged in; "Save to TokenItDown" platform-save built.
+
+---
+
+## ⚠️ Direction change (2026-06-30) — retire the M1–M5 local pipeline, use the portal engine
+
+**Why:** the portal now has a much stronger conversion engine than the extension's local
+M1–M5 pipeline, and we want the extension to reuse it.
+
+**Product intent (from the user):** clicking the extension should convert **the current page**
+to Markdown and let the user **download or copy it right in the popup** — **no redirect to the
+TokenItDown portal, and (ideally) no login**. The current "Save to TokenItDown" flow is close
+but it (a) requires a signed-in session and (b) writes to the user's library; the new intent is
+a friction-free convert-and-return.
+
+**Hard constraint (load-bearing):** the portal's real conversion engine is **MarkItDown, which
+runs server-side in Python** (`server/app/main.py`). **It cannot run inside the Chrome
+extension.** So "use the portal's code" means either (a) call a server endpoint, or (b) only
+port the parts that are pure TypeScript. The genuinely portable piece is the cleaner
+**`lib/markdown/clean.ts`** (tiers raw/clean/compact, unicode/ligature fixes, PDF dehyphenation,
+running-header removal, table normalization, web-chrome stripping, token metering) — it is much
+stronger than the extension's `extension/src/lib/clean.ts`.
+
+**Portal conversion stack (the "new files" to reuse):**
+- `server/app/main.py` — FastAPI wrapper over `MarkItDown(enable_plugins=False)`:
+  `POST /convert` (any file → MD via `convert_stream`) and `POST /convert-url` (SSRF-guarded,
+  YouTube + web). Gated by the `MARKITDOWN_SERVICE_TOKEN` shared secret.
+- `app/api/convert/route.ts` — auth'd file upload → `convertFile` → `cleanMarkdown(tier)` →
+  `saveDocument` (persists original + raw + cleaned + token stats).
+- `app/api/convert/url/route.ts` — auth'd `{url, tier}` → `convertUrl` →
+  `cleanMarkdown(tier, {web:true})` → `saveDocument`.
+- `lib/markitdown-client.ts` — `convertFile` / `convertUrl` (sends the service token).
+- `lib/markdown/clean.ts` — the deterministic cleaner (pure TS, portable).
+
+**Three candidate designs (ONE must be chosen before implementing):**
+1. **Server, no-auth preview endpoint** — add an *unauthenticated* `POST /api/convert/preview`:
+   extension posts the current page's rendered HTML, gets back MarkItDown+cleaned Markdown, **no
+   `saveDocument`, no login, no redirect**. True portal engine. Cost: an open, unauthenticated
+   compute endpoint (bound it with a size limit + no server-side fetch).
+2. **Server, keep login but no redirect** — reuse the better-auth session cookie the extension
+   already sends: if signed in, convert and **return** the Markdown to the popup (download/copy)
+   **without** writing to the library or redirecting; prompt to sign in only if the session is
+   missing. Portal engine, no open endpoint, but still needs a session.
+3. **Fully client-side** — no backend: keep the extension's local Readability→Turndown
+   extraction but **replace `extension/src/lib/clean.ts` with a port of `lib/markdown/clean.ts`**.
+   Offline, no login. Close to portal quality on HTML pages but *not* identical (HTML→MD stays
+   Turndown, not MarkItDown).
+
+**Status: DECISION PENDING** — asked the user to pick 1/2/3; not yet answered. No code changed
+for this direction yet. Whatever is chosen, the plan is to make convert-and-download-in-popup the
+extension's primary behavior and retire the M1–M4 local pipeline (M5 CDP screenshot may be kept
+as a separate optional output — TBD).
+
+**Current extension wiring (unchanged, still in tree):** `handleSaveToLibrary` in
+`service-worker.ts` already posts the page's rendered HTML (`GET_PAGE_HTML`) to `/api/convert`
+via `lib/platform.ts` using the session cookie; the popup already offers a Markdown download
+(`showSaveResult`) plus an "Open Library" link. Designs 1/2 are refinements of this seam.
+
+---
+
 **Branch:** `extension`
 **What this is:** A Chrome MV3 extension under `extension/` that turns a web page into
 clean, LLM-ready Markdown **plus** a full-page screenshot. Two output paths:
