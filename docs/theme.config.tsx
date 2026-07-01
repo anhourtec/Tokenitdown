@@ -1,15 +1,20 @@
 import React from 'react'
+import { useRouter } from 'next/router'
 import { DocsThemeConfig, useConfig } from 'nextra-theme-docs'
 
-const Logo = () => (
-  <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700 }}>
-    {/* basePath ("/docs") is not auto-applied to raw <img>, so prefix it. */}
-    {/* eslint-disable-next-line @next/next/no-img-element */}
-    <img src="/docs/token-it-down.svg" alt="TokenItDown" width={24} height={24} />
-    <span>TokenItDown</span>
-    <span style={{ fontWeight: 400, opacity: 0.6 }}>docs</span>
-  </span>
-)
+const Logo = () => {
+  // basePath is "/docs" when proxied behind the app, "" on the standalone
+  // deploy. Prefix public assets with it so they resolve on both.
+  const { basePath } = useRouter()
+  return (
+    <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700 }}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={`${basePath}/token-it-down.svg`} alt="TokenItDown" width={24} height={24} />
+      <span>TokenItDown</span>
+      <span style={{ fontWeight: 400, opacity: 0.6 }}>docs</span>
+    </span>
+  )
+}
 
 const config: DocsThemeConfig = {
   logo: <Logo />,
@@ -34,6 +39,7 @@ const config: DocsThemeConfig = {
   },
   head: function Head() {
     const { frontMatter, title } = useConfig()
+    const { basePath } = useRouter()
     const pageTitle = title && title !== 'TokenItDown' ? `${title} – TokenItDown` : 'TokenItDown Docs'
     const description =
       (frontMatter.description as string) ||
@@ -41,7 +47,7 @@ const config: DocsThemeConfig = {
     return (
       <>
         <title>{pageTitle}</title>
-        <link rel="icon" href="/docs/favicon.svg" type="image/svg+xml" />
+        <link rel="icon" href={`${basePath}/favicon.svg`} type="image/svg+xml" />
         <meta name="description" content={description} />
         <meta name="theme-color" content="#2563EB" />
         <meta name="og:title" content={pageTitle} />
