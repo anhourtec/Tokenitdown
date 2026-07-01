@@ -32,6 +32,21 @@ which TokenItDown installs from PyPI. The following inputs are supported.
   nav/footer/cookie chrome stripped during cleaning.
 </Callout>
 
+## JavaScript-rendered pages
+
+URL conversion reads the page's **raw HTML** — it does not execute page scripts. For a client-side-rendered
+site (a JavaScript SPA whose body is painted in the browser), the initial HTML is an empty shell, so there is
+no text to extract. Rather than return empty Markdown that looks like a successful, token-saving conversion,
+the converter raises a **thin-content error** (`ThinContentError` → HTTP `422` / an MCP tool error) with a
+clear message. This tells a calling agent the extraction genuinely failed so it can fall back, instead of
+silently getting nothing back. Login walls and empty pages surface the same way. Server-rendered and static
+pages (the vast majority of articles and docs) are unaffected.
+
+<Callout type="info">
+  A future tiered pipeline (see the [roadmap](/roadmap)) will add an optional headless-render fallback that
+  executes page JavaScript for these SPA sites before converting.
+</Callout>
+
 ## SSRF protection for URLs
 
 URL conversion validates the target and **re-validates every redirect hop**, rejecting non-`http(s)`

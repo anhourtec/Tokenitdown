@@ -66,6 +66,27 @@ class UnsupportedContentError(ConversionError):
     """The content could not be parsed into Markdown."""
 
 
+class ThinContentError(ConversionError):
+    """A URL fetched successfully but yielded almost no text — typically a
+    client-side-rendered (JavaScript) page, a login wall, or an empty page.
+
+    We surface this instead of returning near-empty Markdown so the caller
+    (agent) knows the extraction genuinely failed rather than silently getting
+    nothing back — the whole point of the tool is to save tokens, not to hand
+    back an empty result that looks like success."""
+
+
+# A URL conversion whose Markdown has fewer than this many non-whitespace
+# characters is treated as "thin" — effectively no content was extracted.
+# Deliberately conservative so genuinely short pages are not rejected.
+THIN_CONTENT_MIN_CHARS = 24
+
+
+def _is_thin(markdown: str) -> bool:
+    """True when the Markdown carries essentially no text content."""
+    return len("".join(markdown.split())) < THIN_CONTENT_MIN_CHARS
+
+
 # Re-exported so callers can catch the SSRF rejection alongside ConversionError
 # without reaching into app.security.
 __all__ = [
@@ -75,6 +96,7 @@ __all__ = [
     "OversizeError",
     "FetchError",
     "UnsupportedContentError",
+    "ThinContentError",
     "UnsafeURLError",
     "MAX_UPLOAD_BYTES",
     "convert_bytes",
@@ -165,4 +187,16 @@ def convert_url(url: str) -> Conversion:
         print(f"[convert-url] conversion failed for {url!r}: {exc!r}")
         raise UnsupportedContentError("This page could not be converted to Markdown.") from exc
 
-    return Conversion(markdown=result.markdown, title=result.title)
+    markdown = result.markdown or ""
+    if _is_thin(markdown):
+        # The fetch worked but there's no meaningful text — almost always a
+        # JavaScript-rendered page (SPA) whose body is painted client-side, a
+        # login wall, or an empty page. Fail loudly so the agent doesn't treat
+        # an empty result as a successful, token-saving conversion.
+        raise ThinContentError(
+            "The page loaded but returned almost no text. It's most likely rendered "
+            "in the browser with JavaScript, behind a login, or empty — TokenItDown "
+            "reads the raw HTML and can't execute page scripts."
+        )
+
+    return Conversion(markdown=markdown, title=result.title)
