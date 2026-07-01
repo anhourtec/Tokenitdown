@@ -1,7 +1,5 @@
 import { Agents } from "@/components/sections/agents"
-import { Blog } from "@/components/sections/blog"
-import { Community } from "@/components/sections/community"
-import { CtaBand } from "@/components/sections/cta-band"
+import { Closing } from "@/components/sections/closing"
 import { Faq } from "@/components/sections/faq"
 import { Features } from "@/components/sections/features"
 import { Formats } from "@/components/sections/formats"
@@ -29,9 +27,7 @@ export default function HomePage() {
         <Agents />
         <Trust />
         <Faq />
-        <CtaBand />
-        <Community />
-        <Blog />
+        <Closing />
       </main>
       <SiteFooter />
     </>
