@@ -1,0 +1,25 @@
+# Netlify config for the TokenItDown docs site (Nextra / Next.js 14).
+# In Netlify, set the site's base directory to `docs` so this file and the
+# docs app's package.json/lockfile are picked up.
+
+[build]
+  command = "npm run build"
+  publish = ".next"
+
+[build.environment]
+  NODE_VERSION = "20"
+  NPM_FLAGS = "--legacy-peer-deps"
+  # Serve at the domain root (docs-tokenitdown.netlify.app) instead of under
+  # the /docs basePath used when proxied behind the main app.
+  DOCS_STANDALONE = "true"
+
+# Official Next.js runtime: SSR, image optimization, and routing on Netlify.
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+
+[build.processing]
+  skip_processing = false
+
+# Don't rewrite paths to trailing-slash "pretty" URLs; serve routes as-is.
+[build.processing.html]
+  pretty_urls = false
