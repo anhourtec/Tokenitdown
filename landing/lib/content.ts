@@ -21,6 +21,17 @@ export interface Section<T = Record<string, unknown>> {
   body: string
 }
 
+/**
+ * Canonical site origin (no trailing slash). Uses NEXT_PUBLIC_SITE_URL when set
+ * (e.g. the Netlify deploy URL), else the domain declared in `site.md`.
+ */
+export function siteUrl(): string {
+  const env = process.env.NEXT_PUBLIC_SITE_URL
+  if (env) return env.replace(/\/+$/, "")
+  const { data } = getSection<{ domain: string }>("site")
+  return `https://${data.domain}`
+}
+
 /** Read and parse a single top-level content file, e.g. `getSection("hero")`. */
 export function getSection<T = Record<string, unknown>>(name: string): Section<T> {
   const file = path.join(CONTENT_DIR, `${name}.md`)

@@ -4,7 +4,7 @@ import type { Metadata } from "next"
 
 import { ScrollToTop } from "@/components/scroll-to-top"
 import { ThemeProvider } from "@/components/theme-provider"
-import { getSection } from "@/lib/content"
+import { getSection, siteUrl } from "@/lib/content"
 
 import "./globals.css"
 
@@ -19,7 +19,7 @@ export function generateMetadata(): Metadata {
   const { data } = getSection<SiteMeta>("site")
   const title = `${data.name} — ${data.tagline}`
   return {
-    metadataBase: new URL(`https://${data.domain}`),
+    metadataBase: new URL(siteUrl()),
     title: { default: title, template: `%s · ${data.name}` },
     description: data.description,
     openGraph: {
