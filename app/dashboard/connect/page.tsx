@@ -3,9 +3,9 @@ import { redirect } from "next/navigation"
 
 import { agentFileList } from "@/lib/agent-files"
 import { auth } from "@/lib/auth"
+import { mcpPublicUrl } from "@/lib/mcp-url"
 
 import { ConnectClient } from "./_components/connect-client"
-import { env } from "../../../env.mjs"
 
 export const metadata = {
   title: "Connect your editor · TokenItDown",
@@ -15,10 +15,9 @@ export default async function ConnectPage() {
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session) redirect("/login")
 
-  // The hosted MCP endpoint: same host as the dashboard, on the MCP container's
-  // published port (8001 by default — see docker-compose `markitdown-mcp`).
-  const u = new URL(env.BETTER_AUTH_URL)
-  const mcpUrl = `${u.protocol}//${u.hostname}:8001/mcp`
+  // The hosted MCP endpoint: MCP_PUBLIC_URL when set (e.g. a reverse-proxied
+  // subdomain), else derived from the dashboard host + the container's port.
+  const mcpUrl = mcpPublicUrl()
 
   return (
     <div className="@container/main flex flex-col gap-4 md:gap-6">

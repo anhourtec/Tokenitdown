@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Markdown } from "@/components/ui/markdown"
 import { buildAgentFile } from "@/lib/agent-files"
 import { auth } from "@/lib/auth"
+import { mcpPublicUrl } from "@/lib/mcp-url"
 
 import { env } from "../../../../../env.mjs"
 
@@ -22,7 +23,7 @@ export default async function AgentFilePage({ params }: { params: Promise<{ name
   const u = new URL(env.BETTER_AUTH_URL)
   const file = buildAgentFile(name, {
     origin: u.origin,
-    mcpUrl: `${u.protocol}//${u.hostname}:8001/mcp`,
+    mcpUrl: mcpPublicUrl(),
   })
   if (!file) notFound()
 

@@ -2,6 +2,7 @@ import { headers } from "next/headers"
 
 import { buildAgentFile } from "@/lib/agent-files"
 import { auth } from "@/lib/auth"
+import { mcpPublicUrl } from "@/lib/mcp-url"
 
 import { env } from "../../../../env.mjs"
 
@@ -22,7 +23,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ name: s
   const u = new URL(env.BETTER_AUTH_URL)
   const file = buildAgentFile(name, {
     origin: u.origin,
-    mcpUrl: `${u.protocol}//${u.hostname}:8001/mcp`,
+    mcpUrl: mcpPublicUrl(),
   })
   if (!file) {
     return Response.json({ error: "Unknown file." }, { status: 404 })

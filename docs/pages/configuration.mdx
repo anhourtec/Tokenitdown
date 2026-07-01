@@ -30,6 +30,7 @@ All web-app environment variables are typed and validated through `env.mjs` ([T3
 | `STORAGE_DIR` | — | `./data/uploads` | Directory where original uploads are stored (per-user subfolders). A mounted volume in Docker (`/data/uploads`). |
 | `MAX_UPLOAD_BYTES` | — | `52428800` (50 MB) | Max upload size accepted by the convert API, in bytes. |
 | `NEXT_PUBLIC_BETTER_AUTH_URL` | — | current origin | Base URL the browser auth client talks to. Only set if the browser must call a different origin than the page it's served from (rare). |
+| `MCP_PUBLIC_URL` | — | `<host>:8001/mcp` | Public URL agents point at for the hosted MCP server, **including** the trailing `/mcp` path (e.g. `https://mcp.example.com/mcp`). Set this when the MCP server sits behind a reverse proxy. The Connect page prints it in the `claude mcp add` snippet and the downloadable agent files. When unset, it's derived from `BETTER_AUTH_URL`'s host + `:8001/mcp`, which only works if that port is reachable directly. |
 | `ANALYZE` | — | `false` | Enable the Next.js bundle analyzer during `npm run build` (`"true"` / `"false"`). |
 | `SKIP_ENV_VALIDATION` | — | unset | Skip env validation (used in CI builds). Leave unset locally. |
 
@@ -47,6 +48,12 @@ an optional escape hatch.
 | `TOKENITDOWN_MCP_HOST` | — | `0.0.0.0` | HTTP bind host. |
 | `TOKENITDOWN_MCP_PORT` | — | `8001` | HTTP bind port (container). |
 | `MCP_PORT` | — | `8001` | Host port the MCP server is published on (compose maps it to container `8001`). |
+
+<Callout type="info">
+  Putting the MCP server behind a reverse proxy on its own subdomain (e.g. `https://mcp.example.com/mcp`)?
+  Set [`MCP_PUBLIC_URL`](#web-app) on the **web** container so the dashboard's Connect page advertises the
+  clean URL instead of `host:8001`. Then keep port `8001` off the public internet — only 80/443 to the proxy.
+</Callout>
 
 <Callout type="warning">
   An HTTP-mode MCP server with **no** auth is an open conversion proxy, so the server refuses to start in
