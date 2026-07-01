@@ -26,7 +26,7 @@ interface HeroData {
 export function Hero() {
   const { data } = getSection<HeroData>("hero")
   return (
-    <section id="top" className="relative overflow-hidden">
+    <section id="top" className="relative -mt-16 overflow-hidden">
       <div
         aria-hidden
         className="dot-grid pointer-events-none absolute inset-x-0 top-0 -z-10 h-[40rem] opacity-40 [mask-image:radial-gradient(60%_55%_at_50%_0%,black,transparent)]"
@@ -40,7 +40,7 @@ export function Hero() {
         }}
       />
 
-      <div className="mx-auto flex w-full max-w-4xl flex-col items-center gap-6 px-5 pt-20 pb-12 text-center sm:px-8 sm:pt-28">
+      <div className="mx-auto flex w-full max-w-4xl flex-col items-center gap-6 px-5 pt-28 pb-12 text-center sm:px-8 sm:pt-36">
         {data.eyebrow && (
           <Reveal>
             <Eyebrow>{data.eyebrow}</Eyebrow>

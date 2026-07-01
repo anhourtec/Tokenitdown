@@ -23,6 +23,7 @@ export interface NavData {
 
 export function NavBar({ data }: { data: NavData }) {
   const [open, setOpen] = React.useState(false)
+  const [hidden, setHidden] = React.useState(false)
 
   // Lock scroll while the mobile sheet is open.
   React.useEffect(() => {
@@ -31,6 +32,22 @@ export function NavBar({ data }: { data: NavData }) {
       document.body.style.overflow = ""
     }
   }, [open])
+
+  // Show the header only near the top of the page; hide it once scrolled away
+  // (in either direction), so swiping back up doesn't pop it in.
+  React.useEffect(() => {
+    let ticking = false
+    const onScroll = () => {
+      if (ticking) return
+      ticking = true
+      requestAnimationFrame(() => {
+        setHidden(window.scrollY > 96)
+        ticking = false
+      })
+    }
+    window.addEventListener("scroll", onScroll, { passive: true })
+    return () => window.removeEventListener("scroll", onScroll)
+  }, [])
 
   const go = React.useCallback((item: NavItem) => {
     setOpen(false)
@@ -44,10 +61,15 @@ export function NavBar({ data }: { data: NavData }) {
   const itemHref = (item: NavItem) => (item.scroll ? `#${item.scroll}` : resolveHref(item.href ?? "#"))
 
   return (
-    <header className="sticky top-0 z-50 bg-transparent">
+    <header
+      className={cn(
+        "sticky top-0 z-50 bg-transparent transition-transform duration-300 ease-out will-change-transform",
+        hidden && !open ? "-translate-y-full" : "translate-y-0"
+      )}
+    >
       <nav className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between px-5 sm:px-8">
-        <Link href="/" className="flex items-center gap-2 font-semibold tracking-tight" onClick={() => setOpen(false)}>
-          <Image src="/token-it-down.svg" alt="" width={24} height={24} className="size-6" />
+        <Link href="/" className="flex items-center gap-2.5 text-lg font-semibold tracking-tight" onClick={() => setOpen(false)}>
+          <Image src="/token-it-down.svg" alt="" width={32} height={32} className="size-8" />
           {data.name}
         </Link>
 
