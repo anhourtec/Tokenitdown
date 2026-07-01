@@ -14,6 +14,11 @@ jobs:
   web:
     name: Web (typecheck · lint · test · build)
     runs-on: ubuntu-latest
+    env:
+      # next lint / next config load env.mjs, which validates env vars at import
+      # time (T3 Env). CI has no real secrets, so skip validation for static
+      # checks — build (which needs real values) is intentionally not gated here.
+      SKIP_ENV_VALIDATION: "1"
     steps:
       - uses: actions/checkout@v4
 
