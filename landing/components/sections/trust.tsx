@@ -1,4 +1,3 @@
-import { Check } from "lucide-react"
 import Image from "next/image"
 
 import { Reveal } from "@/components/reveal"
@@ -34,8 +33,8 @@ export function Trust() {
           </div>
           <ul className="flex flex-col gap-2.5">
             {data.badges.map((b) => (
-              <li key={b} className="flex items-center gap-2 text-sm">
-                <Check className="size-4 text-primary" />
+              <li key={b} className="flex items-center gap-2.5 text-sm">
+                <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-primary" />
                 {b}
               </li>
             ))}
