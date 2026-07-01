@@ -1,5 +1,7 @@
 import { boolean, index, integer, jsonb, pgTable, text, timestamp } from "drizzle-orm/pg-core"
 
+import type { CleanStats } from "../markdown/clean"
+
 /**
  * better-auth core schema (email/password + sessions).
  *
@@ -91,7 +93,7 @@ export const document = pgTable(
     cleanTokens: integer("cleanTokens").notNull().default(0),
     // Per-transform counts from the cleaning pass (what was eliminated), for
     // transparency in the UI. Shape mirrors CleanStats in lib/markdown/clean.ts.
-    cleanStats: jsonb("cleanStats"),
+    cleanStats: jsonb("cleanStats").$type<CleanStats>(),
     // The API key that created this document when it came from an AI agent via the
     // MCP server; null for conversions made in the dashboard. Logically references
     // api_key.id (keys are revoked, never deleted, so no hard FK is needed). This

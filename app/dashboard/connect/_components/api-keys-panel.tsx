@@ -1,13 +1,18 @@
 "use client"
 
-import { ChevronDown, KeyRound, Loader2, Trash2, TriangleAlert } from "lucide-react"
+import { ChevronDown, ExternalLink, KeyRound, Loader2, Trash2, TriangleAlert } from "lucide-react"
+import Link from "next/link"
 import * as React from "react"
 import { toast } from "sonner"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { CleanInsightsButton } from "@/components/ui/clean-insights"
 import { Input } from "@/components/ui/input"
+import { formatBytes } from "@/lib/utils"
+
+import type { CleanStats } from "@/lib/markdown/clean"
 
 import { CodeBlock } from "./code-block"
 
@@ -26,6 +31,10 @@ interface Conversion {
   title: string
   sourceType: string
   sourceName: string
+  mimetype: string | null
+  sizeBytes: number
+  cleanTier: string
+  cleanStats: CleanStats | null
   rawTokens: number
   cleanTokens: number
   createdAt: string
@@ -37,6 +46,17 @@ function fmt(n: number | undefined): string {
 
 function date(s: string | null): string {
   return s ? new Date(s).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "—"
+}
+
+/** Exact timestamp for the hover title, e.g. "Jun 30, 2026, 6:52 PM". */
+function dateTime(s: string): string {
+  return new Date(s).toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  })
 }
 
 function snippet(mcpUrl: string, token: string): string {
@@ -237,23 +257,63 @@ export function ApiKeysPanel({ mcpUrl }: { mcpUrl: string }) {
                         Nothing converted with this key yet.
                       </p>
                     ) : (
-                      <ul className="flex flex-col gap-1.5">
+                      <ul className="flex flex-col divide-y divide-border/60">
                         {conversions[k.id]?.map((c) => {
-                          const saved = Math.max(0, c.rawTokens - c.cleanTokens)
+                          // The `sourceName` for a URL conversion is the URL itself.
+                          // Only treat it as a clickable link when it's a real
+                          // http(s) URL — never render an unvalidated href (guards
+                          // against javascript:/data: values in legacy rows).
+                          const isUrl = c.sourceType === "url" && /^https?:\/\//i.test(c.sourceName)
+                          const meta = [
+                            c.sizeBytes > 0 ? formatBytes(c.sizeBytes) : null,
+                            c.mimetype,
+                            date(c.createdAt),
+                          ].filter(Boolean)
                           return (
-                            <li key={c.id} className="flex items-center gap-2 text-xs">
-                              <Badge variant="outline" className="shrink-0 capitalize">
-                                {c.sourceType}
-                              </Badge>
-                              <span className="min-w-0 flex-1 truncate text-foreground" title={c.sourceName}>
-                                {c.title || c.sourceName}
-                              </span>
-                              <span className="shrink-0 text-muted-foreground tabular-nums">
-                                −{fmt(saved)} tok
-                              </span>
-                              <span className="hidden shrink-0 text-muted-foreground sm:inline">
-                                {date(c.createdAt)}
-                              </span>
+                            <li key={c.id} className="flex flex-col gap-1 py-2 first:pt-0 last:pb-0 text-xs">
+                              {/* Row 1: type + title (opens the doc in the Library) + savings */}
+                              <div className="flex items-center gap-2">
+                                <Badge variant="outline" className="shrink-0 capitalize">
+                                  {c.sourceType}
+                                </Badge>
+                                <Link
+                                  href={`/dashboard/library?doc=${c.id}`}
+                                  className="group/link flex min-w-0 flex-1 items-center gap-1 font-medium text-foreground hover:text-primary hover:underline"
+                                  title={`Open "${c.title || c.sourceName}" in your Library`}
+                                >
+                                  <span className="truncate">{c.title || c.sourceName}</span>
+                                  <ExternalLink className="size-3 shrink-0 opacity-0 transition-opacity group-hover/link:opacity-100" />
+                                </Link>
+                                <CleanInsightsButton
+                                  rawTokens={c.rawTokens}
+                                  cleanTokens={c.cleanTokens}
+                                  cleanTier={c.cleanTier}
+                                  stats={c.cleanStats}
+                                />
+                              </div>
+                              {/* Row 2: full source + size · type · exact time */}
+                              <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 pl-1 text-muted-foreground">
+                                {isUrl ? (
+                                  <a
+                                    href={c.sourceName}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="max-w-full truncate font-mono hover:text-foreground hover:underline"
+                                    title={c.sourceName}
+                                  >
+                                    {c.sourceName}
+                                  </a>
+                                ) : (
+                                  <span className="max-w-full truncate font-mono" title={c.sourceName}>
+                                    {c.sourceName}
+                                  </span>
+                                )}
+                                {meta.length > 0 && (
+                                  <span className="tabular-nums" title={dateTime(c.createdAt)}>
+                                    · {meta.join(" · ")}
+                                  </span>
+                                )}
+                              </div>
                             </li>
                           )
                         })}

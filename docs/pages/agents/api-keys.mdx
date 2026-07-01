@@ -64,11 +64,15 @@ with the key's `apiKeyId`. The dashboard rolls that up per key:
 
 - **Calls** — the number of conversions the key (agent) performed.
 - **Tokens saved** — total `rawTokens − cleanTokens` across the key's conversions.
-- **What it converted** — the recent list of documents (title, source type/name, token counts, timestamp)
-  the key created.
+- **What it converted** — expand a key to see the recent documents it created. Each row shows:
+  - the **source type** badge (`url` / `file`) and **title**, linking straight to that document in your Library;
+  - the **full source** — the exact URL (clickable) or filename that was converted;
+  - **size, MIME type, and date** (hover the date for the exact timestamp);
+  - a **token-savings** control — click it for the raw → clean breakdown, the cleaning **tier**, and a
+    per-transform list of what was stripped (navigation chrome, repeated headers, image data, …).
 
-This means you can hand an agent a key and later see **exactly** what it read on your behalf, and how many
-tokens that saved — full attribution, no black box.
+This means you can hand an agent a key and later see **exactly** what it read on your behalf, how much each
+conversion saved, and open the result in one click — full attribution, no black box.
 
 ## Static admin token (escape hatch)
 

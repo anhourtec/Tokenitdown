@@ -4,6 +4,8 @@ import { createHash, randomBytes, randomUUID } from "crypto"
 
 import { db, schema } from "./db"
 
+import type { CleanStats } from "./markdown/clean"
+
 /**
  * Per-user API keys for the MCP server / programmatic access.
  *
@@ -158,6 +160,10 @@ export interface KeyConversion {
   title: string
   sourceType: string
   sourceName: string
+  mimetype: string | null
+  sizeBytes: number
+  cleanTier: string
+  cleanStats: CleanStats | null
   rawTokens: number
   cleanTokens: number
   createdAt: Date
@@ -175,6 +181,10 @@ export async function listKeyConversions(
       title: schema.document.title,
       sourceType: schema.document.sourceType,
       sourceName: schema.document.sourceName,
+      mimetype: schema.document.mimetype,
+      sizeBytes: schema.document.sizeBytes,
+      cleanTier: schema.document.cleanTier,
+      cleanStats: schema.document.cleanStats,
       rawTokens: schema.document.rawTokens,
       cleanTokens: schema.document.cleanTokens,
       createdAt: schema.document.createdAt,
