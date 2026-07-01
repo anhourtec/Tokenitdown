@@ -1,6 +1,5 @@
 import Image from "next/image"
 
-import { NewsletterForm } from "@/components/newsletter-form"
 import { ScrollLink } from "@/components/scroll-link"
 import { getSection } from "@/lib/content"
 import { resolveHref } from "@/lib/utils"
@@ -50,12 +49,7 @@ export function SiteFooter() {
             TokenItDown
           </div>
           <p className="max-w-xs text-sm text-muted-foreground">{data.tagline}</p>
-          <NewsletterForm
-            title={data.newsletter.title}
-            body={data.newsletter.body}
-            placeholder={data.newsletter.placeholder}
-            cta={data.newsletter.cta}
-          />
+          {/* Newsletter capture hidden for now (no backend wired yet). */}
         </div>
 
         <div className="grid grid-cols-2 gap-8 sm:grid-cols-3">

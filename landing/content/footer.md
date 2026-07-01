@@ -7,8 +7,8 @@ columns:
         href: "#features"
       - label: For agents
         href: "#agents"
-      - label: How it works
-        href: "#architecture"
+      - label: Formats
+        href: "#formats"
       - label: Open the app
         href: app
   - title: Resources
@@ -16,7 +16,7 @@ columns:
       - label: Documentation
         href: docs
       - label: Blog
-        href: "#blog"
+        href: /blog
       - label: FAQ
         href: "#faq"
       - label: GitHub
