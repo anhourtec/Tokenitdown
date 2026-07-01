@@ -16,6 +16,10 @@ COPY . .
 # Env is validated at runtime (by scripts/docker-start.mjs / the app), not build.
 ENV SKIP_ENV_VALIDATION=true
 ENV NEXT_TELEMETRY_DISABLED=1
+# next.config rewrites are baked in at build time, so the /docs proxy target
+# must be present now (not just at runtime). Defaults to the compose service.
+ARG DOCS_INTERNAL_URL=http://docs:3040
+ENV DOCS_INTERNAL_URL=${DOCS_INTERNAL_URL}
 RUN npm run build
 
 # ---------- runner ----------

@@ -1,0 +1,71 @@
+---
+title: The Tools
+description: The three MCP tools TokenItDown exposes, what they do, and which run mode each is available in.
+---
+
+import { Callout } from 'nextra/components'
+
+# The Tools
+
+The MCP server exposes up to three tools depending on the run mode. Each returns the source's content as
+clean, LLM-ready Markdown.
+
+The server's instructions tell the agent: *call these tools whenever the user references a file or a URL
+you need to read, summarize, quote, or extract from — the Markdown they return is far cheaper and more
+accurate to reason over than raw bytes or HTML.*
+
+## `convert_url_to_markdown(url)`
+
+**Available in both modes.** Convert a web page or online document into clean Markdown.
+
+Use it whenever the user gives an `http(s)` URL — an article, blog post, documentation page, Wikipedia
+entry, **YouTube video (returns the transcript)**, RSS feed, or a link to a PDF/Office file. It strips
+navigation, ads, scripts, and boilerplate and returns only the meaningful content, which is cheaper and
+more accurate to reason over than raw HTML. In HTTP mode the call is proxied to the web app's
+`POST /api/convert/url`. SSRF-guarded in both modes.
+
+```text
+Args:    url (string) — the full http(s) URL to convert
+Returns: the page's content as Markdown
+```
+
+## `convert_file_to_markdown(path)`
+
+**stdio mode only** — the user's own machine. Convert a local file on disk into clean Markdown.
+
+Supports PDF, Word (`.docx`), PowerPoint (`.pptx`), Excel (`.xlsx`)/CSV, images, audio, EPUB, HTML, JSON,
+ZIP, Outlook (`.msg`), and more. The agent reads the document directly without the user copy-pasting
+anything. The path is expanded, checked to exist, and rejected if it exceeds the max upload size.
+
+```text
+Args:    path (string) — absolute or working-directory-relative path to the file
+Returns: the file's content as Markdown
+```
+
+<Callout type="warning">
+  This tool is registered **only** in stdio mode. Over HTTP a `path` argument would be an arbitrary
+  server-side file read, so the hosted endpoint never exposes it.
+</Callout>
+
+## `convert_document(content_base64, filename)`
+
+**HTTP mode only.** Convert an uploaded document (provided as base64 bytes) into clean Markdown.
+
+Use it to read a file the user provides as raw bytes — same format support as the local-file tool. The
+call decodes the base64, then proxies to the web app's `POST /api/convert` (a multipart upload),
+forwarding the agent's API key — so the result is cleaned, token-counted, saved to the user's Library, and
+attributed to the key.
+
+```text
+Args:    content_base64 (string) — the file's bytes, base64-encoded
+         filename       (string) — original filename incl. extension (picks the parser, e.g. "report.pdf")
+Returns: the document's content as Markdown
+```
+
+## Mode summary
+
+| Tool | stdio | HTTP |
+|---|:---:|:---:|
+| `convert_url_to_markdown` | Yes | Yes |
+| `convert_file_to_markdown` | Yes | — |
+| `convert_document` | — | Yes |

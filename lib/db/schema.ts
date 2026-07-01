@@ -1,5 +1,7 @@
 import { boolean, index, integer, jsonb, pgTable, text, timestamp } from "drizzle-orm/pg-core"
 
+import type { CleanStats } from "../markdown/clean"
+
 /**
  * better-auth core schema (email/password + sessions).
  *
@@ -91,10 +93,18 @@ export const document = pgTable(
     cleanTokens: integer("cleanTokens").notNull().default(0),
     // Per-transform counts from the cleaning pass (what was eliminated), for
     // transparency in the UI. Shape mirrors CleanStats in lib/markdown/clean.ts.
-    cleanStats: jsonb("cleanStats"),
+    cleanStats: jsonb("cleanStats").$type<CleanStats>(),
+    // The API key that created this document when it came from an AI agent via the
+    // MCP server; null for conversions made in the dashboard. Logically references
+    // api_key.id (keys are revoked, never deleted, so no hard FK is needed). This
+    // is what powers the per-key "what did this agent convert" transparency view.
+    apiKeyId: text("apiKeyId"),
     createdAt: timestamp("createdAt").notNull().defaultNow(),
   },
-  (table) => [index("document_userId_idx").on(table.userId)]
+  (table) => [
+    index("document_userId_idx").on(table.userId),
+    index("document_apiKeyId_idx").on(table.apiKeyId),
+  ]
 )
 
 /**
@@ -115,4 +125,32 @@ export const userPreference = pgTable("user_preference", {
   updatedAt: timestamp("updatedAt").notNull().defaultNow(),
 })
 
-export const schema = { user, session, account, verification, document, userPreference }
+/**
+ * Per-user API keys for the MCP server / programmatic access. The full token is
+ * shown to the user exactly once at creation; we persist only its SHA-256 hash
+ * (`keyHash`) and the last four chars (`lastFour`) for display. The Python MCP
+ * server validates a presented bearer token via /api/mcp/verify, which looks the
+ * hash up here. Revoking sets `revokedAt` (rows are kept for audit).
+ */
+export const apiKey = pgTable(
+  "api_key",
+  {
+    id: text("id").primaryKey(),
+    userId: text("userId")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    // User-supplied label, e.g. "laptop" or "CI".
+    name: text("name").notNull(),
+    // SHA-256 hex of the full token; the token itself is never stored.
+    keyHash: text("keyHash").notNull().unique(),
+    // Last four chars of the token's secret, for display (tid_…abcd).
+    lastFour: text("lastFour").notNull(),
+    createdAt: timestamp("createdAt").notNull().defaultNow(),
+    lastUsedAt: timestamp("lastUsedAt"),
+    // Set when revoked; a non-null value disables the key.
+    revokedAt: timestamp("revokedAt"),
+  },
+  (table) => [index("api_key_userId_idx").on(table.userId), index("api_key_keyHash_idx").on(table.keyHash)]
+)
+
+export const schema = { user, session, account, verification, document, userPreference, apiKey }

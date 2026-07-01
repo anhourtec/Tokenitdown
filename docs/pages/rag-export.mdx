@@ -1,0 +1,51 @@
+---
+title: RAG Export
+description: Heading-aware chunking with exact per-chunk token counts, ready for a retrieval pipeline.
+---
+
+import { Callout } from 'nextra/components'
+
+# RAG Export
+
+RAG export turns a cleaned document into retrieval-sized chunks, each with an exact token count, ready to
+embed and index. Because the cleaning pass guarantees a sane heading tree, splitting at heading boundaries
+is a near-free way to produce good chunk boundaries.
+
+## How chunking works
+
+Cleaned Markdown is split at heading boundaries (`chunkByHeadings` in `lib/markdown/chunk.ts`). Each chunk
+carries its heading, text, and an exact token count from the same GPT BPE tokenizer used for the savings
+metric. **Fenced code is never split.**
+
+```json
+{
+  "id": "…",
+  "title": "…",
+  "maxLevel": 2,
+  "auto": true,
+  "chunks": [
+    { "index": 0, "heading": "Introduction", "text": "…", "tokens": 412 }
+  ]
+}
+```
+
+## Chunk levels
+
+You choose how granular the split is via the `level` query parameter on
+`GET /api/documents/[id]/chunks`:
+
+| Level | Splits at | When to use |
+|---|---|---|
+| `1` | `H1` only | Long, flat documents — fewer, larger chunks. |
+| `2` *(fallback)* | `H1` + `H2` | A balanced default. |
+| `3` | `H1`–`H3` | Densely structured docs — more, smaller chunks. |
+| `auto` *(default)* | auto-detected | Picks the level that keeps chunks near the retrieval target. |
+
+<Callout type="info">
+  **Auto-detection** (`detectChunkLevel`) tries levels 1–3 and picks the one whose median chunk size sits
+  closest to a retrieval-friendly **~500-token** target, with a penalty for over-fragmenting into many tiny
+  chunks. Heading-less documents fall back to level 1. The default level can be set per user via
+  `user_preference.defaultChunkLevel`.
+</Callout>
+
+See the [API Reference](/api-reference#get-apidocumentsidchunks) for the exact request and response shapes.

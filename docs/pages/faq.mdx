@@ -1,0 +1,70 @@
+---
+title: FAQ
+description: Common questions about data privacy, agent support, API key storage, token savings, and formats.
+---
+
+import { Callout } from 'nextra/components'
+
+# FAQ
+
+## Does my data leave my machine?
+
+**On a self-hosted instance, no.** Every file and URL is converted by the local **markitdown** service,
+originals are stored on a local volume, and the Markdown lives in your own Postgres. When an AI agent reads
+your Library over the local MCP endpoint, the source files never leave the box. The cloud edition is a
+managed multi-tenant service where processing happens on the managed instance.
+
+<Callout type="info">
+  In **stdio** mode the MCP server even converts your local files **in-process** with no upload and no
+  account — nothing is sent anywhere.
+</Callout>
+
+## Which agents are supported?
+
+Any [Model Context Protocol](https://modelcontextprotocol.io) host. That includes Claude Code, Cursor,
+VS Code Copilot, and Claude Desktop with first-class install snippets, plus Codex, Gemini, Windsurf, Cline,
+Aider, and others. For agents that need a nudge, the downloadable
+[`AGENTS.md` / `CLAUDE.md` / `skills.md`](/agents/drop-in-files) files teach them to call TokenItDown.
+
+## How are API keys stored?
+
+The full token (`tid_<base64url secret>`) is shown **exactly once** at creation and **never stored**. Only
+its **SHA-256 hash** and the **last four characters** are persisted. The hosted MCP server is stateless and
+validates a presented key by calling the web app's internal `/api/mcp/verify`. See
+[API Keys & Transparency](/agents/api-keys).
+
+## What's the token saving?
+
+It depends on the source, but cleaning routinely removes a meaningful chunk of every conversion —
+boilerplate, broken markup, repeated headers/footers, and (in `compact` mode) link URLs. TokenItDown
+measures it exactly with a **real GPT BPE tokenizer**, reporting `rawTokens`, `cleanTokens`, the absolute
+tokens saved, and the percent reduction per conversion and across your whole Library. See
+[Token Counting](/converting/tokens).
+
+## What formats can it convert?
+
+PDF, Word, PowerPoint, Excel, images (OCR + EXIF), audio (transcription), HTML, CSV/JSON/XML, ZIP (iterated),
+EPUB, Outlook `.msg`, web-page URLs, and YouTube URLs (transcript). See
+[Supported Formats](/converting/formats).
+
+## Can an agent convert without an account?
+
+Yes — in **local (stdio)** mode. The editor runs the server as a subprocess and converts your own files in
+place. **Hosted (HTTP)** mode requires a per-user API key so conversions can be cleaned, counted, saved to
+your Library, and attributed to you.
+
+## How big a file can I upload?
+
+Up to `MAX_UPLOAD_BYTES` (default **50 MB**). Larger uploads are rejected with `413`. The limit is
+configurable — see [Configuration](/configuration).
+
+## Is it safe to convert arbitrary URLs?
+
+URL conversion is **SSRF-guarded**: it validates the target and re-validates every redirect hop, rejecting
+non-`http(s)` schemes and any host resolving to a private, loopback, link-local (including the cloud
+metadata address), multicast, or reserved address.
+
+## What's the license?
+
+[MIT](https://github.com/AnHourTec/TokenItDown), © AnHourTec. Conversion is powered by
+[Microsoft MarkItDown](https://github.com/microsoft/markitdown).

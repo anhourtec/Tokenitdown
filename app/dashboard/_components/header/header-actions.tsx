@@ -1,6 +1,6 @@
 "use client"
 
-import { CircleUser, CreditCard, LogOut, MessageSquareDot } from "lucide-react"
+import { CircleUser, LogOut } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 
@@ -78,14 +78,6 @@ export function HeaderActions({ user }: { user: HeaderUser }) {
             <DropdownMenuItem onClick={() => router.push("/dashboard/account")}>
               <CircleUser />
               Account
-            </DropdownMenuItem>
-            <DropdownMenuItem>
-              <CreditCard />
-              Billing
-            </DropdownMenuItem>
-            <DropdownMenuItem>
-              <MessageSquareDot />
-              Notifications
             </DropdownMenuItem>
           </DropdownMenuGroup>
           <DropdownMenuSeparator />

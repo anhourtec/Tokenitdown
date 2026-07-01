@@ -85,9 +85,9 @@ export function AuthForm({ mode }: { mode: Mode }) {
   return (
     <div className="flex w-full flex-1 flex-col justify-center px-4 py-10 lg:px-6">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        {/* Use the original PNG directly (no next/image optimization). */}
+        {/* Use the SVG directly (no next/image optimization). */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/token_it_down_logo.png" alt="TokenItDown" className="mx-auto h-20 w-auto" />
+        <img src="/token-it-down.svg" alt="TokenItDown" className="mx-auto h-20 w-auto" />
         <h3 className="text-foreground mt-4 text-center text-lg font-bold">
           {isRegister ? "Create your TokenItDown account" : "Sign in to TokenItDown"}
         </h3>

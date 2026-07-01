@@ -1,0 +1,47 @@
+name: Agent / MCP compatibility
+description: A coding agent or MCP host doesn't connect or call TokenItDown correctly
+labels: [mcp, compatibility]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        TokenItDown aims to work with **every** agent. These reports are especially valuable — thank you!
+  - type: input
+    id: agent
+    attributes:
+      label: Agent / editor
+      placeholder: e.g. Claude Code, Codex, Cursor, Gemini CLI, Windsurf, Cline, VS Code Copilot
+    validations:
+      required: true
+  - type: dropdown
+    id: transport
+    attributes:
+      label: Transport
+      options:
+        - Local (stdio)
+        - Hosted (streamable HTTP)
+        - Not sure
+    validations:
+      required: true
+  - type: textarea
+    id: snippet
+    attributes:
+      label: Install snippet / config used
+      description: The exact command or MCP config you used (redact any API key).
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: expected-actual
+    attributes:
+      label: What did you expect vs. what happened?
+      description: e.g. "expected the agent to call convert_url_to_markdown, but it fetched the URL itself."
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Agent / server logs
+      render: shell
+    validations:
+      required: false

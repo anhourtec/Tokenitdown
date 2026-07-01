@@ -43,9 +43,18 @@ storybook-static/
 # processing service (Python)
 server/vendor/
 server/.venv/
+server/.venv-mcp/
 **/__pycache__/
 server/.pytest_cache/
 *.pyc
 
 # uploaded originals (local storage volume)
 /data/
+
+# local agent working files (not part of the public repo)
+HANDOFF.md
+CLAUDE.md
+# internal planning / competitive-strategy notes (kept local, not published)
+plans/
+# local-only demo data seed (populates a dev DB for screenshots)
+scripts/seed-demo.mjs

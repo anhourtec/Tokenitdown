@@ -169,18 +169,24 @@ function NavItem({ item, isItemActive, isSubItemActive, isSubmenuOpen }: NavItem
 }
 
 function NavLinkItem({ item, isActive, showIconFallback }: NavLinkItemProps) {
+  const target = item.newTab ? "_blank" : undefined;
+  const rel = item.newTab ? "noreferrer" : undefined;
   return (
     <SidebarMenuItem>
       <SidebarMenuButton asChild aria-disabled={item.disabled} tooltip={item.title} isActive={isActive}>
-        <Link
-          prefetch={false}
-          href={item.url}
-          target={item.newTab ? "_blank" : undefined}
-          rel={item.newTab ? "noreferrer" : undefined}
-        >
-          <NavLinkIcon item={item} showFallback={showIconFallback} />
-          <span>{item.title}</span>
-        </Link>
+        {item.external ? (
+          // Served by another app behind a rewrite (e.g. /docs) — a plain anchor
+          // hard-navigates instead of attempting a Next client-side route.
+          <a href={item.url} target={target} rel={rel}>
+            <NavLinkIcon item={item} showFallback={showIconFallback} />
+            <span>{item.title}</span>
+          </a>
+        ) : (
+          <Link prefetch={false} href={item.url} target={target} rel={rel}>
+            <NavLinkIcon item={item} showFallback={showIconFallback} />
+            <span>{item.title}</span>
+          </Link>
+        )}
       </SidebarMenuButton>
       <NavItemBadge badge={item.badge} />
     </SidebarMenuItem>

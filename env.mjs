@@ -33,6 +33,16 @@ export const env = createEnv({
     STORAGE_DIR: z.string().default("./data/uploads"),
     // Max upload size accepted by the convert API, in bytes (default 50 MB).
     MAX_UPLOAD_BYTES: z.coerce.number().int().positive().default(52428800),
+    // Base URL of the internal docs (Nextra) container. When set, the app proxies
+    // /docs/* to it so docs are served at the same origin (ip:PORT/docs). Inside
+    // docker-compose this is http://docs:3000; unset locally unless you run docs.
+    DOCS_INTERNAL_URL: z.string().url().optional(),
+    // Public URL agents point at for the hosted (HTTP) MCP server, INCLUDING the
+    // trailing /mcp path — e.g. https://mcp.example.com/mcp when it sits behind a
+    // reverse proxy. When unset, the Connect page falls back to deriving it from
+    // the dashboard host + the MCP container's published port (…:8001/mcp), which
+    // is only reachable if that port is exposed directly.
+    MCP_PUBLIC_URL: z.string().url().optional(),
   },
   client: {
     // Base URL the browser auth client talks to. Defaults to the current origin
@@ -50,6 +60,8 @@ export const env = createEnv({
     MARKITDOWN_SERVICE_TOKEN: process.env.MARKITDOWN_SERVICE_TOKEN,
     STORAGE_DIR: process.env.STORAGE_DIR,
     MAX_UPLOAD_BYTES: process.env.MAX_UPLOAD_BYTES,
+    DOCS_INTERNAL_URL: process.env.DOCS_INTERNAL_URL,
+    MCP_PUBLIC_URL: process.env.MCP_PUBLIC_URL,
     NEXT_PUBLIC_BETTER_AUTH_URL: process.env.NEXT_PUBLIC_BETTER_AUTH_URL,
   },
   // Allow `npm run build` / drizzle-kit and CI to run without a full env.

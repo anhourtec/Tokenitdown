@@ -1,0 +1,49 @@
+name: Bug report
+description: Something isn't working as expected
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for taking the time to file a bug! Please fill out the sections below.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: A clear description of the bug, including what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: How can we reproduce it? For conversion bugs, include the source type (PDF, URL, …) — not the file itself if it's sensitive.
+      placeholder: |
+        1. Go to '...'
+        2. Convert '...'
+        3. See error
+    validations:
+      required: true
+  - type: dropdown
+    id: deployment
+    attributes:
+      label: How are you running TokenItDown?
+      options:
+        - Local dev (npm run dev)
+        - Self-hosted (docker compose / deploy.sh)
+        - Other (describe below)
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, browser, Node version, and anything else relevant.
+    validations:
+      required: false
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs / console output
+      render: shell
+    validations:
+      required: false

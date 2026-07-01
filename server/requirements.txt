@@ -4,6 +4,12 @@
 # ffmpeg + exiftool are installed in the Dockerfile (audio + image EXIF).
 markitdown[all]==0.1.6
 fastapi==0.115.6
-uvicorn[standard]==0.34.0
+uvicorn[standard]==0.35.0
 python-multipart==0.0.32
 requests==2.34.2
+# MCP server (app/mcp_server.py) — lets coding agents call TokenItDown directly.
+# Pinned to the 2.x line: 2.14.7 is the latest patched 2.x — it clears the fastmcp
+# security advisories (SSRF/path-traversal, OAuth-proxy issues, command-injection,
+# and CVE-2025-66416 via mcp>=1.23) while still resolving under fastapi 0.115.6's
+# starlette<0.42 cap. 3.x would force starlette>=1.0.1, which conflicts with that.
+fastmcp==2.14.7

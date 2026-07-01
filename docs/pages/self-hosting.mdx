@@ -1,0 +1,99 @@
+---
+title: Self-Hosting & Deployment
+description: Deploy the full TokenItDown stack with docker compose — web, Postgres, Redis, the MarkItDown converter, and the MCP server.
+---
+
+import { Callout, Steps } from 'nextra/components'
+
+# Self-Hosting & Deployment
+
+The self-hosted edition ships as a `docker compose` bundle. One command builds the images and brings up
+the whole stack — and because all processing is local, **no document or key ever leaves your machine**.
+
+## What's in the stack
+
+The bundle (`docker-compose.yml`) runs five services on one private bridge network:
+
+| Service | Image / tech | Role | Exposure |
+|---|---|---|---|
+| **web** | `tokenitdown-web` — Next.js 15 + React 19 | Dashboard, auth, and all API routes. Owns the database. | Published — host `${WEB_PORT:-3030}` → container `3000` |
+| **markitdown** | `tokenitdown-markitdown` — Python / FastAPI + `markitdown[all]` | Converts uploads and URLs to Markdown. | Internal only — no published port |
+| **markitdown-mcp** | Same image, MCP entrypoint | MCP server so AI agents can reach this instance. | Published — host `${MCP_PORT:-8001}` → container `8001` |
+| **postgres** | `postgres:17-alpine` | Users, sessions, documents, API keys. | Host `5433` → container `5432` |
+| **redis** | `redis:7-alpine` | Reserved for the job queue / session store (password-protected). | Host `6386` → container `6379` |
+
+<Callout type="info">
+  The **markitdown** converter publishes no host port — only the `web` container reaches it, gated by the
+  shared `MARKITDOWN_SERVICE_TOKEN`. The **markitdown-mcp** server reuses the same image (no second build)
+  but runs `python -m app.mcp_server` in streamable-HTTP mode so editors can connect to it.
+</Callout>
+
+## Deploy with `./deploy.sh`
+
+<Steps>
+
+### Prepare the host
+
+```bash
+cp .env.example .env
+```
+
+Fill in real secrets — at minimum `BETTER_AUTH_SECRET`, `MARKITDOWN_SERVICE_TOKEN`, `POSTGRES_PASSWORD`,
+and `REDIS_PASSWORD`. Set `BETTER_AUTH_URL` to the URL users will actually hit (and keep its port in sync
+with `WEB_PORT`). See [Configuration](/configuration).
+
+### Run the deploy script
+
+```bash
+./deploy.sh
+```
+
+`deploy.sh` does a clean rebuild and relaunch:
+
+1. Stops any existing containers (`docker compose down`).
+2. Removes old images **for this project only**.
+3. Rebuilds all images from scratch with `--no-cache`.
+4. Starts the stack with `docker compose up -d`.
+5. Prints `docker compose ps` and the URLs.
+
+</Steps>
+
+## What runs on startup
+
+- **web** waits for `postgres` and `redis` to be healthy and for `markitdown` to pass its health check
+  (`/health`), then **ensures the database and applies Drizzle migrations** (`scripts/docker-deploy.mjs`)
+  before serving.
+- Inside compose, the web container overrides its connection strings to reach the sibling containers:
+  `postgres:5432`, `redis:6379`, and `http://markitdown:8000`. It stores original uploads on the mounted
+  `uploads_data` volume at `/data/uploads`.
+- **markitdown-mcp** points at the web app via `TOKENITDOWN_WEB_URL=http://web:3000` so it can validate
+  per-user API keys and proxy conversions back through the web pipeline.
+
+## Ports
+
+The default ports are deliberately offset so the stack can coexist with other apps on the same host:
+
+| What | Host port | Container port | Override |
+|---|---|---|---|
+| Web app | `3030` | `3000` | `WEB_PORT` |
+| MCP server | `8001` | `8001` | `MCP_PORT` |
+| Postgres | `5433` | `5432` | — |
+| Redis | `6386` | `6379` | — |
+
+<Callout type="warning">
+  If you change `WEB_PORT`, also update `BETTER_AUTH_URL` (and `TRUSTED_ORIGINS` if needed) so the port in
+  the auth URL matches the published web port — otherwise sign-in and cookies break.
+</Callout>
+
+## Health checks
+
+- **web** — Kubernetes-compatible `/api/health` (aliased to `/healthz`, `/health`, `/ping`) returning
+  `{ status: "ok" }`. Compose checks it via a `fetch` to `/api/health`.
+- **markitdown** — its own `GET /health`.
+- **markitdown-mcp** — the MCP endpoint is auth-gated with no open health route, so compose checks the
+  listening socket on port `8001` directly.
+
+```bash
+# Tail the web logs
+docker compose logs -f web
+```

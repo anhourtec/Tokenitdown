@@ -1,0 +1,94 @@
+---
+title: Install in Your Editor
+description: Exact snippets to add the TokenItDown MCP server to Claude Code, Cursor, VS Code, and Claude Desktop — local (stdio) or hosted (HTTP).
+---
+
+import { Callout, Tabs } from 'nextra/components'
+
+# Install in Your Editor
+
+There are two ways to connect: **local (stdio)** converts your own files in place with no account, and
+**hosted (HTTP)** lets an agent on any machine reach your TokenItDown instance with a per-user API key.
+
+The dashboard's **Connect editor** page (`/dashboard/connect`) also offers these snippets pre-filled with
+your instance's hosted endpoint, plus downloadable [drop-in agent files](/agents/drop-in-files).
+
+## Local (stdio) — convert your own files, no account
+
+The editor launches the server as a subprocess and converts files in-process on your machine.
+
+<Tabs items={['Claude Code', 'Cursor / Claude Desktop', 'VS Code']}>
+  <Tabs.Tab>
+```bash
+claude mcp add tokenitdown -- python -m app.mcp_server
+```
+  </Tabs.Tab>
+  <Tabs.Tab>
+`~/.cursor/mcp.json` · Claude Desktop `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "tokenitdown": {
+      "command": "python",
+      "args": ["-m", "app.mcp_server"]
+    }
+  }
+}
+```
+  </Tabs.Tab>
+  <Tabs.Tab>
+`.vscode/mcp.json` — note the top-level key is `servers`:
+
+```json
+{
+  "servers": {
+    "tokenitdown": {
+      "type": "stdio",
+      "command": "python",
+      "args": ["-m", "app.mcp_server"]
+    }
+  }
+}
+```
+  </Tabs.Tab>
+</Tabs>
+
+<Callout type="info">
+  `python -m app.mcp_server` must run from the `server/` directory (or with `server/` on `PYTHONPATH`) so
+  the `app` package resolves. Smoke-test it with the inspector:
+  `npx @modelcontextprotocol/inspector python -m app.mcp_server`.
+</Callout>
+
+## Hosted (HTTP) — for agents on any machine
+
+First create an API key on the dashboard's **Connect editor** page
+(`<your-instance>/dashboard/connect`), then point your editor at the instance's MCP endpoint
+(`http://<host>:8001/mcp`) with the key as a Bearer token.
+
+<Tabs items={['Claude Code', 'Generic MCP host']}>
+  <Tabs.Tab>
+```bash
+claude mcp add --transport http tokenitdown https://mcp.your-host/mcp \
+  --header "Authorization: Bearer YOUR_TOKENITDOWN_API_KEY"
+```
+  </Tabs.Tab>
+  <Tabs.Tab>
+Point any MCP host at the URL with an `Authorization` header:
+
+```
+URL:    https://<host>:8001/mcp
+Header: Authorization: Bearer YOUR_TOKENITDOWN_API_KEY
+```
+  </Tabs.Tab>
+</Tabs>
+
+Every conversion made with a key is tracked in the dashboard — call count, tokens saved, and exactly what
+was converted. See [API Keys & Transparency](/agents/api-keys).
+
+## Other agents
+
+The same approach works with **Codex, Gemini, Windsurf, Cline, Aider**, and any other MCP host. The
+simplest way to teach an arbitrary agent to use TokenItDown is to drop in one of the generated
+[`AGENTS.md` / `CLAUDE.md` / `skills.md`](/agents/drop-in-files) files, which carry your instance's hosted
+endpoint and the usage guidance.

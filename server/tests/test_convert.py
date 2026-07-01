@@ -1,10 +1,7 @@
-import io
-
 import pytest
 from fastapi.testclient import TestClient
 
 import app.main as main
-from app.main import app
 
 TOKEN = "test-service-token-1234567890"
 
@@ -17,7 +14,7 @@ def _set_token(monkeypatch):
 
 @pytest.fixture
 def client():
-    return TestClient(app)
+    return TestClient(main.app)
 
 
 def _auth():

@@ -68,6 +68,46 @@ services:
     networks:
       - tokenitdown-network
 
+  # Same image as `markitdown`, but run as the MCP server over streamable HTTP so
+  # coding agents (Claude Code, Cursor, VS Code, Claude Desktop) can reach this
+  # instance. PUBLISHED on the host (editors connect to it) and gated by a bearer
+  # token (TOKENITDOWN_MCP_TOKEN). Reuses the markitdown image — no second build.
+  markitdown-mcp:
+    image: tokenitdown-markitdown
+    container_name: tokenitdown-markitdown-mcp
+    restart: unless-stopped
+    command: ["python", "-m", "app.mcp_server"]
+    environment:
+      TOKENITDOWN_MCP_HTTP: "1"
+      TOKENITDOWN_MCP_PORT: "8001"
+      # Per-user API keys are validated against the web app (it owns the DB). The
+      # MCP server calls web's internal /api/mcp/verify over the compose network,
+      # authenticating with the shared service token.
+      TOKENITDOWN_WEB_URL: http://web:3000
+      MARKITDOWN_SERVICE_TOKEN: ${MARKITDOWN_SERVICE_TOKEN:?set MARKITDOWN_SERVICE_TOKEN in .env}
+      # Optional static admin token (escape hatch / smoke tests). Per-user keys are
+      # the normal path, so this can be left empty.
+      TOKENITDOWN_MCP_TOKEN: ${TOKENITDOWN_MCP_TOKEN:-}
+      MAX_UPLOAD_BYTES: ${MAX_UPLOAD_BYTES:-52428800}
+    ports:
+      # Host port editors point at: http://<host>:${MCP_PORT}/mcp
+      - "${MCP_PORT:-8001}:8001"
+    depends_on:
+      # Ensures the shared image is built/available before this starts.
+      markitdown:
+        condition: service_started
+    healthcheck:
+      # The MCP endpoint is auth-gated and has no open /health route, so check the
+      # listening socket directly.
+      test:
+        ["CMD", "python", "-c", "import socket; socket.create_connection(('localhost', 8001), 2).close()"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - tokenitdown-network
+
   web:
     build:
       context: .
@@ -89,6 +129,9 @@ services:
       # the mounted volume.
       MARKITDOWN_SERVICE_URL: http://markitdown:8000
       STORAGE_DIR: /data/uploads
+      # Proxy /docs/* to the docs container so docs are served at this origin
+      # (ip:WEB_PORT/docs). The docs app builds with basePath "/docs".
+      DOCS_INTERNAL_URL: http://docs:3040
     ports:
       # Host port is configurable (WEB_PORT) to avoid clashes with other apps on
       # the server. Keep BETTER_AUTH_URL in .env in sync with this port.
@@ -109,6 +152,26 @@ services:
       timeout: 5s
       retries: 5
       start_period: 40s
+    networks:
+      - tokenitdown-network
+
+  # Documentation site (Next.js + Nextra). Internal-only: the web app proxies
+  # /docs/* to it, so it needs no published host port. Reached at ip:WEB_PORT/docs.
+  docs:
+    build:
+      context: ./docs
+    image: tokenitdown-docs
+    container_name: tokenitdown-docs
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      NEXT_TELEMETRY_DISABLED: "1"
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://localhost:3040/docs').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     networks:
       - tokenitdown-network
 

@@ -1,0 +1,73 @@
+---
+title: Introduction
+description: TokenItDown turns any document or web page into clean, LLM-ready Markdown — and lets your AI read it directly, for a fraction of the tokens.
+---
+
+import { Callout, Cards } from 'nextra/components'
+
+# TokenItDown
+
+> Drop in a file or a web page, get agent-ready Markdown out — and let your AI read it directly, for a fraction of the tokens.
+
+**TokenItDown** is a fast, self-hostable platform that turns any document or web page into clean,
+LLM-ready Markdown. It goes past the conversion itself to deliver the things most tools stop short of:
+visible quality control, RAG-ready output, token economics, and native agent (MCP) access.
+
+Built and maintained by **AnHourTec**. Conversion is powered by
+[Microsoft MarkItDown](https://github.com/microsoft/markitdown); TokenItDown is the workflow, quality
+control, RAG export, and agent integration wrapped around it.
+
+## Why it exists
+
+The conversion engine is commoditized — MarkItDown, Docling, and Marker all exist and are self-hostable.
+TokenItDown's value is the **workflow around the conversion**: the library, the cleaning pass, the RAG
+export, the per-key transparency view, and the agent integration, packaged cleanly for both cloud users
+and self-hosters.
+
+Three ideas drive the product:
+
+- **Clean, LLM-ready Markdown.** Every conversion runs a deterministic cleaning pass after the engine —
+  heading repair, table/list normalization, boilerplate strip, de-hyphenation, base64-image extraction,
+  whitespace collapse — so the output is something an LLM can reason over directly, not raw extractor noise.
+- **Token savings, measured.** A real GPT BPE tokenizer counts tokens before and after cleaning, so every
+  conversion reports exactly how many tokens you saved. That's the "TokenItDown" promise made visible.
+- **Native agent access.** A built-in [Model Context Protocol](https://modelcontextprotocol.io) (MCP)
+  server lets Claude Code, Cursor, VS Code Copilot, Codex, Gemini, or Claude Desktop call TokenItDown the
+  moment you hand the agent a file or a URL — so the agent reads pre-converted Markdown instead of
+  re-parsing raw bytes on every call.
+
+## What you can do with it
+
+- **Convert anything to Markdown** — PDF, Word, PowerPoint, Excel, images (OCR + EXIF), audio
+  (transcription), HTML, CSV/JSON/XML, ZIP (iterated), EPUB, and YouTube / web-page URLs.
+- **Browse a Library** — every converted document in a resizable viewer with a Preview / Raw toggle,
+  copy, download, and delete.
+- **Keep your originals** — every uploaded file is previewed in place with an Original / Markdown toggle.
+- **Export RAG-ready chunks** — heading-aware chunking with exact per-chunk token counts.
+- **Connect your coding agent** — install the MCP server in your editor, mint per-user API keys, and get
+  full transparency into what each agent converted.
+
+## Cloud vs self-hosted
+
+Two deployment targets from one codebase:
+
+| | Cloud | Self-hosted |
+|---|---|---|
+| **What it is** | Multi-tenant SaaS with managed processing and a hosted MCP endpoint | A single `docker compose up` — web + Postgres + Redis + the MarkItDown service |
+| **Where data lives** | On the managed instance | Entirely on your machine — no data egress |
+| **MCP endpoint** | Hosted | Your instance exposes its own |
+| **Best for** | Trying it quickly, teams who want it managed | Homelabs, privacy-conscious teams, "your keys, your data" |
+
+<Callout type="info">
+  **Self-hosted means no data egress.** When you run TokenItDown yourself, every file and URL is processed
+  on your own box. Agents reading your Library never cause source files to leave the machine.
+</Callout>
+
+## Next steps
+
+<Cards>
+  <Cards.Card title="Getting Started" href="/getting-started" />
+  <Cards.Card title="Self-Hosting & Deployment" href="/self-hosting" />
+  <Cards.Card title="AI Agents (MCP)" href="/agents" />
+  <Cards.Card title="Architecture" href="/architecture" />
+</Cards>

@@ -16,7 +16,6 @@ import { sidebarItems } from "@/navigation/sidebar/sidebar-items"
 
 import { NavMain } from "./nav-main"
 import { NavUser } from "./nav-user"
-import { SidebarSupportCard } from "./sidebar-support-card"
 
 interface AppSidebarUser {
   readonly name: string
@@ -43,7 +42,6 @@ export function AppSidebar({ user, ...props }: React.ComponentProps<typeof Sideb
         <NavMain items={sidebarItems} />
       </SidebarContent>
       <SidebarFooter>
-        <SidebarSupportCard />
         <NavUser user={user} />
       </SidebarFooter>
     </Sidebar>

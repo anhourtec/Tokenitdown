@@ -108,7 +108,8 @@ async function main() {
     log("✓ Migrations applied.", colors.green)
   }
 
-  const port = process.env.PORT ?? "3000"
+  // Coerce PORT to a bare integer so it can never inject into the shell command.
+  const port = String(Number.parseInt(process.env.PORT ?? "3000", 10) || 3000)
   log(`\nStarting Next.js on port ${port}...`, colors.green)
   execSync(`npx next start -p ${port}`, { stdio: "inherit" })
 }

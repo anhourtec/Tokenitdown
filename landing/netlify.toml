@@ -1,0 +1,28 @@
+# Netlify config for the TokenItDown landing site (Next.js 15, App Router).
+# In Netlify, set the site's base directory to `landing` so this file and the
+# app's package.json/lockfile are picked up.
+
+[build]
+  command = "npm run build"
+  publish = ".next"
+
+[build.environment]
+  NODE_VERSION = "20"
+  NPM_FLAGS = "--legacy-peer-deps"
+
+# Outbound links have sane production defaults in next.config.mjs; override here
+# (or in the Netlify UI) if the app/docs/repo live on different origins.
+# NEXT_PUBLIC_APP_URL = "https://app.tokenitdown.com"
+# NEXT_PUBLIC_DOCS_URL = "https://tokenitdown.com/docs"
+# NEXT_PUBLIC_GITHUB_URL = "https://github.com/anhourtec/tokenitdown"
+
+# Official Next.js runtime: SSR, image optimization, and routing on Netlify.
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+
+[build.processing]
+  skip_processing = false
+
+# Don't rewrite paths to trailing-slash "pretty" URLs; serve routes as-is.
+[build.processing.html]
+  pretty_urls = false

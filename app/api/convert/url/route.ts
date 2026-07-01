@@ -1,5 +1,6 @@
 import { headers } from "next/headers"
 
+import { resolveRequestUser } from "@/lib/api-keys"
 import { auth } from "@/lib/auth"
 import { saveDocument } from "@/lib/documents"
 import { cleanMarkdown } from "@/lib/markdown/clean"
@@ -9,9 +10,15 @@ import { getPreferences } from "@/lib/preferences"
 
 export const runtime = "nodejs"
 
-export async function POST(req: Request) {
+async function sessionUserId(): Promise<string | null> {
   const session = await auth.api.getSession({ headers: await headers() })
-  if (!session) {
+  return session?.user.id ?? null
+}
+
+export async function POST(req: Request) {
+  // Either a dashboard session or an agent's API key (tagged onto the document).
+  const actor = await resolveRequestUser(req, sessionUserId)
+  if (!actor) {
     return Response.json({ error: "Unauthorized" }, { status: 401 })
   }
 
@@ -21,7 +28,7 @@ export async function POST(req: Request) {
     return Response.json({ error: "A 'url' is required." }, { status: 400 })
   }
 
-  const prefs = await getPreferences(session.user.id)
+  const prefs = await getPreferences(actor.userId)
   const tier = body?.tier === "compact" ? "compact" : body?.tier === "clean" ? "clean" : prefs.defaultCleanTier
 
   try {
@@ -30,7 +37,8 @@ export async function POST(req: Request) {
     const { markdown, stats } = cleanMarkdown(raw, tier, { web: true })
     const tokens = tokenSavings(raw, markdown)
     const doc = await saveDocument({
-      userId: session.user.id,
+      userId: actor.userId,
+      apiKeyId: actor.apiKeyId,
       title,
       sourceType: "url",
       sourceName: url,

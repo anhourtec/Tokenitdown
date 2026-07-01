@@ -15,8 +15,8 @@ test-results
 npm-debug.log*
 README.md
 HANDOFF.md
-PLAN.md
-DESIGN.md
+CLAUDE.md
+docs
 e2e
 **/*.test.ts
 **/*.test.tsx

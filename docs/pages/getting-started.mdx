@@ -1,0 +1,114 @@
+---
+title: Getting Started
+description: Run TokenItDown locally for development — install dependencies, configure your environment, bring up the services, and run your first conversion.
+---
+
+import { Callout, Steps } from 'nextra/components'
+
+# Getting Started
+
+This guide gets a local development environment running and walks you through your first conversion. For
+a production install, see [Self-Hosting & Deployment](/self-hosting).
+
+## Requirements
+
+- **Node.js `>=22`** and **npm** — npm is the project's package manager. Never use pnpm or yarn.
+- **Docker** + Docker Compose — for Postgres, Redis, and the MarkItDown processing service.
+- **Python `>=3.10`** — only if you want to run the processing service outside Docker.
+
+## Local development
+
+<Steps>
+
+### Install dependencies
+
+A better-auth peer dependency requires the legacy peer-deps resolver:
+
+```bash
+npm install --legacy-peer-deps
+```
+
+### Configure your environment
+
+Copy the example file and fill in real secrets:
+
+```bash
+cp .env.example .env
+```
+
+At minimum set `BETTER_AUTH_SECRET` (a long random string), `MARKITDOWN_SERVICE_TOKEN` (the shared secret
+between the web app and the converter), and your database credentials. See
+[Configuration](/configuration) for every variable.
+
+```bash
+# Generate strong secrets
+openssl rand -base64 32   # BETTER_AUTH_SECRET
+openssl rand -base64 24   # MARKITDOWN_SERVICE_TOKEN
+```
+
+<Callout type="warning">
+  `MARKITDOWN_SERVICE_TOKEN` must be **identical** in the web app's `.env` and in the markitdown
+  container's environment — it's the shared secret the web app sends as `X-Service-Token` on every call to
+  the converter. A mismatch makes every conversion fail with an auth error.
+</Callout>
+
+### Bring up Postgres, Redis, and the converter
+
+```bash
+docker compose up -d postgres redis markitdown
+```
+
+The `markitdown` service is the Python FastAPI wrapper around `markitdown[all]`. It's internal-only — no
+host port is published; the web app reaches it over the compose network.
+
+### Run the web app
+
+```bash
+npm run dev
+```
+
+`npm run dev` ensures the database exists and applies Drizzle migrations before starting the dev server.
+Open [http://localhost:3000](http://localhost:3000).
+
+</Steps>
+
+## Your first conversion
+
+1. **Register** an account at `/register`, then sign in.
+2. Open **Convert** in the sidebar and pick a source type (PDF, Word, Excel, Image, URL, …). Each format
+   has a dedicated page with drag-and-drop batch upload.
+3. Drop in a file (or paste a URL). A document-scan animation plays while the converter runs, then a
+   GitHub-style rendered result appears with the **tokens saved** for that conversion.
+4. View the result in **Library** (Preview / Raw toggle) and the original file in **Documents**.
+
+## Running the processing service without Docker
+
+If you'd rather run the converter directly with Python:
+
+```bash
+cd server
+python3.12 -m venv .venv
+./.venv/bin/pip install -r requirements-dev.txt
+MARKITDOWN_SERVICE_TOKEN=<token> ./.venv/bin/uvicorn app.main:app --port 8000
+```
+
+The image (and a dev install) needs `ffmpeg` + `exiftool` for audio transcription and image/audio EXIF
+extraction.
+
+## Useful scripts
+
+| Command | Description |
+|---|---|
+| `npm run dev` | Ensure DB + migrate, then start the dev server |
+| `npm run build` | Create a production build |
+| `npm run start` | Start the production server |
+| `npm run typecheck` | Type-check with `tsc` (strict) |
+| `npm run lint` | Run ESLint |
+| `npm run test` | Run unit & integration tests (Vitest) |
+| `npm run e2e:headless` | Run end-to-end tests (Playwright) |
+| `npm run db:generate` | Generate a Drizzle migration from the schema |
+| `npm run db:migrate` | Apply migrations |
+| `npm run db:studio` | Open Drizzle Studio |
+| `npm run storybook` | Start Storybook on port 6006 |
+
+Processing-service tests: `cd server && ./.venv/bin/python -m pytest`.

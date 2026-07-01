@@ -1,79 +1,46 @@
-# Design System — TokenItDown (AnHourTec)
+# DESIGN.md — TokenItDown
 
-The visual language for TokenItDown. Inherits the **AnHourTec** visual system; the product carries its own wordmark while the company identity stays AnHourTec.
+Inherited from the AnHourTec visual system and the running app (`styles/tailwind.css`). The landing site (`landing/`) mirrors these tokens exactly so marketing and product feel like one thing.
 
-> Scope: this document covers **colors and typography** only. For product scope, architecture, and feature plans see [`PLAN.md`](./PLAN.md).
+## Color
 
-**Voice:** professional yet approachable, benefit-led, no hype words.
+Neutral (zinc) base with **AnHourTec Blue `#2563EB`** as the single brand accent. Blue carries brand, primary CTAs, focus rings, and links; everything else is a tinted neutral. Strategy is **Committed** on the hero (blue leads the identity surface) and **Restrained** through the body (neutral surfaces, blue accents ≤10%).
 
----
+| Role | Light | Dark |
+|---|---|---|
+| Primary | `#2563EB` | `#3B82F6` |
+| Ring / focus | `#2563EB` | `#3B82F6` |
+| Secondary accent | `#60A5FA` (blue-400) | `#60A5FA` |
+| Purple accent (sparingly) | `#8B5CF6` | `#A78BFA` |
+| Success | `#22C55E` | `#34D399` |
+| Background | near-white `oklch(1 0 0)` | near-black `oklch(0.145 0 0)` |
+| Foreground | `oklch(0.145 0 0)` | `oklch(0.985 0 0)` |
+| Border | `oklch(0.922 0 0)` | `oklch(1 0 0 / 10%)` |
 
-## 1. Color
+Neutrals are OKLCH with ~0 chroma; never `#000`/`#fff` flat. Tokens live in `landing/app/globals.css` (copied from the app).
 
-### Brand blues
-| Token | Hex | Usage |
-|-------|-----|-------|
-| Primary Blue | `#2563EB` | Brand, primary CTAs, theme color |
-| Blue 500 | `#3B82F6` | Buttons, interactive elements, logo |
-| Blue 400 | `#60A5FA` | Gradients, secondary accent |
-| Blue 300 | `#93C5FD` | Dark-mode primary |
+## Theme
 
-### Neutrals
-| Token | Hex |
-|-------|-----|
-| Gray 900 | `#111827` |
-| Gray 600 | `#4B5563` |
-| Gray 400 | `#9CA3AF` |
-| Gray 200 | `#E5E7EB` |
-| Gray 100 | `#F3F4F6` |
-| White | `#FFFFFF` |
+Default to **system**, with a real dark mode. Scene: a developer evaluating a dev tool, often in a dark IDE at their desk, skimming for whether it's legit before they trust it. Both themes are first-class and must look deliberate, not one bolted on.
 
-### Dark mode
-| Role | Hex |
-|------|-----|
-| Background | `#030712` |
-| Card | `#111827` |
-| Border | `#1F2937` |
-| Muted | `#9CA3AF` |
-| Primary | `#93C5FD` |
+## Typography
 
-### Semantic
-| Role | Hex |
-|------|-----|
-| Success | `#22C55E` |
-| Error | `#EF4444` |
-| Purple accent | `#8B5CF6` |
+- **Geist Sans** (UI/body) + **Geist Mono** (code, token counts, install snippets) — matches the app exactly, self-hosted via the `geist` package.
+- H1: display size, `font-extrabold`, `tracking-tight`. H2/H3: `font-bold`/`font-semibold`, tight tracking. Body: `font-normal`, relaxed leading, capped at ~68ch.
+- Scale steps keep ≥1.25 contrast. Mono is used deliberately for anything token/code related, reinforcing the "for engineers" register.
 
-### Gradient
-Hero / emphasis surfaces:
+## Motion
 
-```css
-background: linear-gradient(135deg, #2563EB, #60A5FA, #8B5CF6);
-```
+- **GSAP ScrollTrigger** drives scroll reveals (`components/scroll-reveal.tsx`): short translate + fade, `power2.out`, no bounce/elastic. Stagger siblings by delay. Honors `prefers-reduced-motion` (renders visible, no motion).
+- Never animate layout properties; transform + opacity only.
 
----
+## Layout & components
 
-## 2. Typography
+- Real product screenshots (`.github/screenshots/*.png`) are the primary visual, GitHub-readme style. No stock art, no robot illustrations.
+- Avoid the identical-card-grid reflex: vary section rhythm and composition. Cards only where they are the best affordance; never nested.
+- Full borders only (1px) — no colored side-stripe accents. Emphasis via weight, scale, or background tint.
+- Mono-labeled token/code details (install snippets, `tid_…` keys, token savings) reinforce the technical brand.
 
-- **Font family** — system stack (native, fast, no web-font load):
-  ```css
-  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
-    Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
-  ```
-- **H1** — extrabold, `tracking-tight` (tight letter-spacing).
-- **Body** — `leading-relaxed` (relaxed line-height) for readability.
+## Anti-patterns (bans)
 
-| Element | Weight | Notes |
-|---------|--------|-------|
-| H1 | `font-extrabold` | `tracking-tight`, large display sizes |
-| H2–H3 | `font-bold` | Section headings |
-| Body | `font-normal` | `leading-relaxed` |
-| Muted / captions | `font-normal` | Gray 400 / dark-mode muted |
-
----
-
-## 3. Implementation notes
-
-- Colors map to Tailwind tokens; the brand blues align with Tailwind's `blue-600/500/400/300`. Define them as CSS custom properties / Tailwind theme tokens in `styles/tailwind.css` so light and dark modes share one source of truth.
-- Prefer the system font stack — do not add a web-font dependency without a deliberate decision.
-- Dark mode is first-class: every surface defines both a light and a dark value above.
+No gradient text, no hero-metric stat template, no glassmorphism-by-default, no em dashes in copy, no side-stripe borders.

@@ -1,7 +1,7 @@
 "use client"
 
 import * as AccordionPrimitive from "@radix-ui/react-accordion"
-import { Check, Code2, Copy, Eye, FileCode, FileIcon, FolderIcon, FolderOpenIcon } from "lucide-react"
+import { Check, ChevronLeft, Code2, Copy, Eye, FileCode, FileIcon, FolderIcon, FolderOpenIcon } from "lucide-react"
 import { useTheme } from "next-themes"
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button"
 import { Markdown } from "@/components/ui/markdown"
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { useIsMobile } from "@/hooks/use-mobile"
 import { cn } from "@/lib/utils"
 
 const MARKDOWN_EXTS = ["md", "mdx", "markdown"]
@@ -154,6 +155,7 @@ function FileHeader({
   isMarkdown,
   view,
   onToggleView,
+  onBack,
 }: {
   file: { path: string; content?: string }
   onCopy: () => void
@@ -162,10 +164,17 @@ function FileHeader({
   isMarkdown: boolean
   view: "preview" | "raw"
   onToggleView: (next: "preview" | "raw") => void
+  /** When set (mobile master-detail), renders a back-to-list button. */
+  onBack?: () => void
 }) {
   return (
     <div className="flex items-center justify-between gap-2 border-b px-3 py-1.5">
-      <div className="flex min-w-0 items-center gap-2">
+      <div className="flex min-w-0 items-center gap-1.5">
+        {onBack && (
+          <Button variant="ghost" size="icon" className="-ml-1 size-8 shrink-0" title="Back to files" onClick={onBack}>
+            <ChevronLeft className="size-4" />
+          </Button>
+        )}
         <Badge variant="outline" className="text-xs">
           {getFileType(file.path)}
         </Badge>
@@ -442,6 +451,9 @@ export default function ComponentFileViewer({
   const [selectedFile, setSelectedFile] = useState<string | undefined>(undefined)
   const [copied, setCopied] = useState(false)
   const [view, setView] = useState<"preview" | "raw">("preview")
+  // On mobile the two panes become a master-detail: list → tap → viewer (with back).
+  const isMobile = useIsMobile()
+  const [mobilePane, setMobilePane] = useState<"list" | "file">("list")
   const files = useMemo(() => component.files.filter((f) => f.content), [component.files])
 
   const tree = useMemo(() => {
@@ -488,43 +500,64 @@ export default function ComponentFileViewer({
     }
   }
 
+  const handleFileSelect = (path: string) => {
+    setSelectedFile(path)
+    setMobilePane("file")
+  }
+
+  const treePane = (
+    <FileTree tree={tree} selectedFile={selectedFile} onFileSelect={handleFileSelect} component={component} />
+  )
+
+  const contentPane = selected ? (
+    (() => {
+      const ext = selected.path.split(".").pop()?.toLowerCase() ?? ""
+      const isMarkdown = MARKDOWN_EXTS.includes(ext)
+      return (
+        <div className="flex h-full flex-col">
+          <FileHeader
+            file={selected}
+            onCopy={handleCopy}
+            copied={copied}
+            actions={headerActions}
+            isMarkdown={isMarkdown}
+            view={view}
+            onToggleView={setView}
+            onBack={isMobile ? () => setMobilePane("list") : undefined}
+          />
+          <ScrollArea className="min-h-0 flex-1">
+            {isMarkdown && view === "preview" ? (
+              <div className="p-5">
+                <Markdown content={selected.content ?? ""} />
+              </div>
+            ) : (
+              <ShikiViewer code={selected.content ?? ""} lang={ext || "markdown"} />
+            )}
+          </ScrollArea>
+        </div>
+      )
+    })()
+  ) : (
+    <div className="grid h-full place-items-center text-sm text-muted-foreground">No file selected</div>
+  )
+
+  // Mobile: a single column that swaps between the file list and the viewer.
+  if (isMobile) {
+    return (
+      <div className={cn("flex min-h-0 flex-col overflow-hidden rounded-lg border", className)}>
+        {mobilePane === "file" && selected ? contentPane : treePane}
+      </div>
+    )
+  }
+
   return (
     <ResizablePanelGroup direction="horizontal" className={cn("rounded-lg border", className)}>
       <ResizablePanel defaultSize={26} minSize={18} maxSize={42}>
-        <FileTree tree={tree} selectedFile={selectedFile} onFileSelect={setSelectedFile} component={component} />
+        {treePane}
       </ResizablePanel>
       <ResizableHandle withHandle />
       <ResizablePanel defaultSize={74} minSize={40}>
-        {selected ? (
-          (() => {
-            const ext = selected.path.split(".").pop()?.toLowerCase() ?? ""
-            const isMarkdown = MARKDOWN_EXTS.includes(ext)
-            return (
-              <div className="flex h-full flex-col">
-                <FileHeader
-                  file={selected}
-                  onCopy={handleCopy}
-                  copied={copied}
-                  actions={headerActions}
-                  isMarkdown={isMarkdown}
-                  view={view}
-                  onToggleView={setView}
-                />
-                <ScrollArea className="min-h-0 flex-1">
-                  {isMarkdown && view === "preview" ? (
-                    <div className="p-5">
-                      <Markdown content={selected.content ?? ""} />
-                    </div>
-                  ) : (
-                    <ShikiViewer code={selected.content ?? ""} lang={ext || "markdown"} />
-                  )}
-                </ScrollArea>
-              </div>
-            )
-          })()
-        ) : (
-          <div className="grid h-full place-items-center text-sm text-muted-foreground">No file selected</div>
-        )}
+        {contentPane}
       </ResizablePanel>
     </ResizablePanelGroup>
   )

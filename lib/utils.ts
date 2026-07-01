@@ -24,6 +24,15 @@ export const getInitials = (str: string): string => {
   )
 }
 
+/** Human-readable byte size, e.g. 12345 -> "12.1 KB". */
+export function formatBytes(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes <= 0) return "0 B"
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`
+}
+
 /** Locale-aware currency formatting. */
 export function formatCurrency(
   amount: number,

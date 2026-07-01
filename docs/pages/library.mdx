@@ -1,0 +1,45 @@
+---
+title: Library & Documents
+description: The two views over your conversions — cleaned Markdown in the Library, and your original files in Documents.
+---
+
+import { Callout } from 'nextra/components'
+
+# Library & Documents
+
+TokenItDown gives you two views over everything you convert: the **Library** (the cleaned Markdown output)
+and **Documents** (your original uploaded files).
+
+## Library — the converted Markdown
+
+Every converted document appears in a resizable file viewer with a **Preview / Raw** toggle:
+
+- **Preview** — rendered Markdown via `react-markdown` + `remark-gfm`, styled with Tailwind Typography.
+- **Raw** — the syntax-highlighted Markdown source via [Shiki](https://shiki.style/).
+
+Each entry supports **copy**, **download**, and **delete**, and shows the conversion's token savings. The
+Library is searchable and filterable across all your converted Markdown.
+
+## Documents — your originals
+
+The **Documents** view shows every **original** uploaded file, previewed in place:
+
+- **PDFs** render in the browser's native viewer.
+- **Images** display inline.
+- Other types are downloadable.
+
+Each document has an **Original / Markdown** toggle (jump between the source file and its converted output)
+and a delete action.
+
+## Where things are stored
+
+- **Cleaned + raw Markdown** lives in **Postgres** (the `document` row), along with token counts, the
+  cleaning tier, per-transform clean stats, and source metadata.
+- **Original files** are written to disk under `STORAGE_DIR` (a mounted volume at `/data/uploads` in
+  Docker), in per-user subfolders. URL sources have no stored original.
+
+<Callout type="info">
+  The original is **always** persisted on conversion. The `storeOriginals` preference only controls whether
+  it's surfaced on the Documents page — it doesn't change whether bytes are written. The raw engine output
+  is kept alongside the cleaned Markdown so a document can be re-processed without re-converting.
+</Callout>

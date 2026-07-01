@@ -1,0 +1,47 @@
+---
+title: Cleaning Tiers
+description: The deterministic cleaning pass that runs after the converter — what it fixes and the three tiers.
+---
+
+import { Callout } from 'nextra/components'
+
+# Cleaning Tiers
+
+After the engine produces raw Markdown and before it's persisted, every conversion runs through a
+deterministic normalizer (`lib/markdown/clean.ts`). The pass is **pure** (no network, no external deps)
+and **idempotent** — `clean(clean(x)) === clean(x)`. Fenced code blocks are masked out first so none of the
+text transforms can corrupt code.
+
+## What the cleaning pass fixes
+
+Each transform repairs a predictable MarkItDown / PDF-extraction defect, and the per-transform counts are
+reported back (and stored as `cleanStats`) for transparency in the UI:
+
+- **Heading promotion** — repairs the heading tree so chunking and navigation work.
+- **Table / list normalization** — fixes mangled tables and broken list markers.
+- **Boilerplate strip** — removes repeated headers/footers and reading-order cruft.
+- **De-hyphenation** — rejoins words split across line breaks.
+- **Base64-image extraction** — pulls inline images out of the text body.
+- **Whitespace collapse** + **Unicode NFC** normalization.
+- **Web chrome removal** (URL sources only) — strips nav/footer/cookie banners.
+
+## The three tiers
+
+| Tier | What it does | Lossy? |
+|---|---|---|
+| **`raw`** | Returns the input unchanged — measure only. | No |
+| **`clean`** *(default)* | Lossless fidelity + token-economy fixes (everything above). | No |
+| **`compact`** | `clean` **plus** lossy pruning — strips link URLs. Always reported, never silent. | Yes (reported) |
+
+<Callout type="info">
+  The tier is chosen per conversion. API callers can pass an explicit `tier` (`clean` or `compact`);
+  otherwise the user's saved default (`user_preference.defaultCleanTier`) is used. The chosen tier is
+  stored on the document so you always know how a given output was produced.
+</Callout>
+
+## Reported stats
+
+The cleaning pass returns a `CleanStats` object — `headingsPromoted`, `tablesNormalized`, `imagesExtracted`,
+`boilerplateLinesRemoved`, `hyphenationsJoined`, `linksStripped` (compact only), and `webChromeRemoved`
+(web sources only). These are persisted on the `document` row so the dashboard can show exactly what was
+changed.
