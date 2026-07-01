@@ -1,0 +1,156 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+@plugin '@tailwindcss/typography';
+
+@custom-variant dark (&:is(.dark *));
+
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-border, currentColor);
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    font-family: var(--font-sans), system-ui, sans-serif;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11", "salt";
+    -webkit-font-smoothing: antialiased;
+  }
+
+  ::selection {
+    background: color-mix(in oklch, var(--primary) 22%, transparent);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* --- utilities ---------------------------------------------------------- */
+
+/* 24px dot-grid texture (behind hero + CTA). */
+@utility dot-grid {
+  background-image: radial-gradient(var(--color-border) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+/* Soft product-frame surround: a padded off-white gradient bezel with a big
+   radius, used to seat screenshots and sample panels. */
+@utility surface-bezel {
+  background-image: linear-gradient(to bottom, var(--color-card), color-mix(in oklch, var(--color-muted) 55%, var(--color-card)));
+  border: 1px solid var(--color-border);
+}
+
+/* Edge-fade mask for the marquee trust strip. */
+@utility marquee-mask {
+  -webkit-mask-image: linear-gradient(to right, transparent, black 8%, black 92%, transparent);
+  mask-image: linear-gradient(to right, transparent, black 8%, black 92%, transparent);
+}
+
+@keyframes tid-marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(calc(-50% - var(--tid-gap, 3rem)));
+  }
+}
+
+@utility animate-marquee {
+  animation: tid-marquee var(--tid-duration, 42s) linear infinite;
+}
+
+/* --- design tokens (mirrors the app: zinc neutrals + AnHourTec blue) ----- */
+:root {
+  --radius: 0.75rem;
+
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.16 0.004 260);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.16 0.004 260);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.16 0.004 260);
+  --primary: #2563eb;
+  --primary-foreground: oklch(0.985 0 0);
+  --primary-accent: #60a5fa;
+  --secondary: oklch(0.97 0.002 260);
+  --secondary-foreground: oklch(0.21 0.004 260);
+  --muted: oklch(0.968 0.002 260);
+  --muted-foreground: oklch(0.552 0.006 260);
+  --accent: oklch(0.968 0.002 260);
+  --accent-foreground: oklch(0.21 0.004 260);
+  --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: oklch(0.985 0 0);
+  --border: oklch(0.922 0.003 260);
+  --input: oklch(0.922 0.003 260);
+  --ring: #2563eb;
+}
+
+.dark {
+  --background: oklch(0.15 0.006 260);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.198 0.006 260);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.198 0.006 260);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: #3b82f6;
+  --primary-foreground: oklch(0.985 0 0);
+  --primary-accent: #60a5fa;
+  --secondary: oklch(0.26 0.006 260);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.26 0.006 260);
+  --muted-foreground: oklch(0.708 0.006 260);
+  --accent: oklch(0.26 0.006 260);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --destructive-foreground: oklch(0.985 0 0);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 14%);
+  --ring: #3b82f6;
+}
+
+@theme inline {
+  --font-sans: var(--font-geist-sans), system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), monospace;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-accent: var(--primary-accent);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 10px);
+  --radius-3xl: calc(var(--radius) + 20px);
+}
