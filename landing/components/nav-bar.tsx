@@ -104,9 +104,6 @@ export function NavBar({ data }: { data: NavData }) {
             <Github className="size-4" />
             {data.ctaSecondary.label}
           </ButtonLink>
-          <ButtonLink href={resolveHref(data.ctaPrimary.href)} size="sm" className="hidden sm:inline-flex">
-            {data.ctaPrimary.label}
-          </ButtonLink>
 
           {/* hamburger */}
           <button
@@ -146,9 +143,6 @@ export function NavBar({ data }: { data: NavData }) {
             </a>
           ))}
           <div className="mt-3 flex flex-col gap-2 border-t border-border pt-4">
-            <ButtonLink href={resolveHref(data.ctaPrimary.href)} size="lg" className="w-full">
-              {data.ctaPrimary.label}
-            </ButtonLink>
             <ButtonLink href={resolveHref(data.ctaSecondary.href)} variant="secondary" size="lg" className="w-full">
               <Github className="size-4" />
               {data.ctaSecondary.label}

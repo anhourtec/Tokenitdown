@@ -70,7 +70,7 @@ export function SiteFooter() {
       <div className="border-t border-border">
         <div className="mx-auto flex w-full max-w-6xl flex-col gap-2 px-5 py-6 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between sm:px-8">
           <span>© {year} AnHourTec. {data.legal}</span>
-          <span className="font-mono">tokenitdown.com</span>
+          <span className="font-mono">tokenitdown.netlify.app</span>
         </div>
       </div>
     </footer>

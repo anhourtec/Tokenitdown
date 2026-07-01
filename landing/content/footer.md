@@ -9,8 +9,6 @@ columns:
         href: "#agents"
       - label: Formats
         href: "#formats"
-      - label: Open the app
-        href: app
   - title: Resources
     links:
       - label: Documentation

@@ -15,7 +15,7 @@ install:
       cmd: bun add -g tokenitdown
 skill:
   title: Add it as an agent skill
-  cmd: npx skills add https://github.com/anhourtec/tokenitdown --skill tokenitdown
+  cmd: npx skills add https://github.com/anhourtec/Tokenitdown --skill tokenitdown
 mcp:
   title: Connect over MCP
   local:
@@ -24,7 +24,7 @@ mcp:
   hosted:
     label: Hosted (HTTP) — remote agents, per-user key
     cmd: |
-      claude mcp add --transport http tokenitdown https://mcp.tokenitdown.com/mcp \
+      claude mcp add --transport http tokenitdown https://mcp.your-domain.com/mcp \
         --header "Authorization: Bearer YOUR_TOKENITDOWN_API_KEY"
 tools:
   - name: convert_url_to_markdown
@@ -37,7 +37,7 @@ api:
   title: Or call the API
   body: Send one file, get Markdown back, then drop the same call into your agent, RAG job, or batch pipeline.
   cmd: |
-    curl -X POST https://api.tokenitdown.com/v1/convert \
+    curl -X POST https://api.your-domain.com/v1/convert \
       -H "Authorization: Bearer $TOKENITDOWN_API_KEY" \
       -F "file=@./paper.pdf"
 ---

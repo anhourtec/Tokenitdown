@@ -8,8 +8,8 @@ export function cn(...inputs: ClassValue[]) {
 /** Outbound links, overridable per environment (see next.config.mjs). */
 export const links = {
   app: process.env.NEXT_PUBLIC_APP_URL || "https://app.tokenitdown.com",
-  docs: process.env.NEXT_PUBLIC_DOCS_URL || "https://tokenitdown.com/docs",
-  github: process.env.NEXT_PUBLIC_GITHUB_URL || "https://github.com/anhourtec/tokenitdown",
+  docs: process.env.NEXT_PUBLIC_DOCS_URL || "https://docs-tokenitdown.netlify.app",
+  github: process.env.NEXT_PUBLIC_GITHUB_URL || "https://github.com/anhourtec/Tokenitdown",
 }
 
 /** Resolve a content href: a known outbound key (app/docs/github) or a literal. */
