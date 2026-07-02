@@ -8,8 +8,13 @@ uvicorn[standard]==0.35.0
 python-multipart==0.0.32
 requests==2.34.2
 # MCP server (app/mcp_server.py) — lets coding agents call TokenItDown directly.
-# Pinned to the 2.x line: 2.14.7 is the latest patched 2.x — it clears the fastmcp
-# security advisories (SSRF/path-traversal, OAuth-proxy issues, command-injection,
-# and CVE-2025-66416 via mcp>=1.23) while still resolving under fastapi 0.115.6's
-# starlette<0.42 cap. 3.x would force starlette>=1.0.1, which conflicts with that.
-fastmcp==2.14.7
+# 3.2.0 is the first release that patches the current fastmcp advisories: the
+# OpenAPI-provider SSRF/path-traversal (GHSA-vv7q-7jx5-f767), the OAuth-proxy
+# confused-deputy / missing consent verification (GHSA-rww4-4w9c-7733), and the
+# command injection (GHSA-m8x7-r2rg-vh5g) — all fixed only in >=3.2.0, not the 2.x
+# line. It still resolves under fastapi 0.115.6's starlette<0.42 cap: fastmcp 3.x
+# pulls mcp>=1.24 (starlette>=0.27, no upper bound), so pip lands on starlette
+# 0.41.x. The app's fastmcp usage (FastMCP(name/instructions/auth), @mcp.tool,
+# TokenVerifier/AccessToken, get_access_token, run(transport="http", host, port))
+# is unchanged across 2.x -> 3.2.0.
+fastmcp==3.2.0
